@@ -1,0 +1,72 @@
+// Stenopos standard library — collections module
+// Common data structures
+
+module collections
+
+// Dynamic list (resizable array)
+// Usage: List[int32] nums = List.new()
+//        nums.push(42)
+//        int32 x = nums.get(0)
+class List[T] {
+    // TODO: implement
+    private ptr[void] data
+    private uint64 length
+    private uint64 capacity
+
+    func push(T item) -> void {
+        // TODO: implement
+    }
+
+    func get(uint64 index) -> T {
+        // TODO: implement
+    }
+
+    func len() -> uint64 {
+        return length
+    }
+}
+
+// Hash map (key-value store)
+// Usage: Map[str, int32] scores = Map.new()
+//        scores.set("alice", 100)
+//        int32 s = scores.get("alice")
+class Map[K, V] {
+    // TODO: implement
+    private ptr[void] data
+
+    func set(K key, V value) -> void {
+        // TODO: implement
+    }
+
+    func get(K key) -> V {
+        // TODO: implement
+    }
+
+    func contains(K key) -> bool {
+        // TODO: implement
+        return false
+    }
+}
+
+// Hash set (unique values)
+// Usage: Set[str] seen = Set.new()
+//        seen.add("hello")
+//        bool b = seen.contains("hello")
+class Set[T] {
+    // TODO: implement
+    private ptr[void] data
+
+    func add(T item) -> void {
+        // TODO: implement
+    }
+
+    func contains(T item) -> bool {
+        // TODO: implement
+        return false
+    }
+
+    func len() -> uint64 {
+        // TODO: implement
+        return 0
+    }
+}

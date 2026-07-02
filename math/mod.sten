@@ -1,0 +1,64 @@
+// Stenopos standard library — math module
+// Mathematical functions and constants
+
+module math
+
+const float64 PI = 3.141592653589793
+const float64 E  = 2.718281828459045
+const float64 TAU = 6.283185307179586
+
+extern "C" func sqrt(float64 x) -> float64
+extern "C" func pow(float64 base, float64 exp) -> float64
+extern "C" func fabs(float64 x) -> float64
+extern "C" func floor(float64 x) -> float64
+extern "C" func ceil(float64 x) -> float64
+extern "C" func round(float64 x) -> float64
+extern "C" func log(float64 x) -> float64
+extern "C" func log2(float64 x) -> float64
+extern "C" func log10(float64 x) -> float64
+extern "C" func sin(float64 x) -> float64
+extern "C" func cos(float64 x) -> float64
+extern "C" func tan(float64 x) -> float64
+
+// Minimum of two int32 values
+func min_i32(int32 a, int32 b) -> int32 {
+    if (a < b) {
+        return a
+    }
+    return b
+}
+
+// Maximum of two int32 values
+func max_i32(int32 a, int32 b) -> int32 {
+    if (a > b) {
+        return a
+    }
+    return b
+}
+
+// Minimum of two float64 values
+func min_f64(float64 a, float64 b) -> float64 {
+    if (a < b) {
+        return a
+    }
+    return b
+}
+
+// Maximum of two float64 values
+func max_f64(float64 a, float64 b) -> float64 {
+    if (a > b) {
+        return a
+    }
+    return b
+}
+
+// Clamp a value between lo and hi
+func clamp_f64(float64 val, float64 lo, float64 hi) -> float64 {
+    if (val < lo) {
+        return lo
+    }
+    if (val > hi) {
+        return hi
+    }
+    return val
+}

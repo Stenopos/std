@@ -1,0 +1,48 @@
+// Stenopos standard library — string module
+// String utilities beyond the built-in methods
+
+module string
+
+// Split a string by a delimiter, returning an array of parts.
+// Example: split("a,b,c", ",") -> ["a", "b", "c"]
+func split(str s, str delim) -> str[] {
+    // TODO: implement
+    return []
+}
+
+// Join an array of strings with a separator.
+// Example: join(["a", "b", "c"], ",") -> "a,b,c"
+func join(str[] parts, str sep) -> str {
+    // TODO: implement
+    return ""
+}
+
+// Repeat a string n times.
+// Example: repeat("ab", 3) -> "ababab"
+func repeat(str s, int32 n) -> str {
+    // TODO: implement
+    return ""
+}
+
+// Check if a string is empty (zero length).
+func is_empty(str s) -> bool {
+    return s.len() == 0
+}
+
+// Pad a string on the left to a given width with a fill character.
+func pad_left(str s, int32 width, str fill) -> str {
+    // TODO: implement
+    return s
+}
+
+// Pad a string on the right to a given width with a fill character.
+func pad_right(str s, int32 width, str fill) -> str {
+    // TODO: implement
+    return s
+}
+
+// Count occurrences of a substring.
+func count(str s, str sub) -> int32 {
+    // TODO: implement
+    return 0
+}

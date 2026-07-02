@@ -1,0 +1,39 @@
+// Stenopos standard library — io module
+// File and console I/O
+
+module io
+
+// Read the entire contents of a file as a string.
+// Raises IOError if the file cannot be opened or read.
+func read_file(str path) -> str {
+    // TODO: implement
+    return ""
+}
+
+// Write a string to a file, creating it if it does not exist.
+// Raises IOError if the file cannot be written.
+func write_file(str path, str content) -> void {
+    // TODO: implement
+}
+
+// Append a string to a file.
+func append_file(str path, str content) -> void {
+    // TODO: implement
+}
+
+// Read a line from standard input.
+func read_line() -> str {
+    // TODO: implement
+    return ""
+}
+
+// Print to standard output with a newline.
+func println(str s) -> void {
+    printf("{s}\n")
+}
+
+// Print to standard error.
+func eprintln(str s) -> void {
+    // TODO: implement using stderr
+    printf("{s}\n")
+}
