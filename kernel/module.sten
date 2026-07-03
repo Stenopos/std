@@ -1,0 +1,44 @@
+// Stenopos standard library — kernel.module
+// Module lifecycle and metadata.
+//
+// A loadable kernel module has an init function (run at `insmod`) and an exit
+// function (run at `rmmod`), plus metadata that `modinfo` reads. In C these
+// are wired up with the module_init()/module_exit() macros and
+// MODULE_LICENSE()/MODULE_AUTHOR()/... which place strings in the ".modinfo"
+// ELF section. Stenopos models both with @section placement.
+
+module kernel.module
+
+// Return values for a module's init function.
+const int32 MODULE_OK = 0        // loaded successfully
+
+// A GPL license is REQUIRED for full kernel API access; without it the kernel
+// taints and hides GPL-only ("_GPL") symbols. Declare exactly one license.
+//
+// Place these in your module (the @section puts them where modinfo looks):
+//
+//   @section(".modinfo")
+//   const str LICENSE = "license=GPL"
+//   @section(".modinfo")
+//   const str AUTHOR = "author=Your Name"
+//   @section(".modinfo")
+//   const str DESCRIPTION = "description=What this module does"
+//   @section(".modinfo")
+//   const str VERSION = "version=1.0"
+
+// Convention for the entry points. Mark your init/exit functions with these
+// sections so the loader runs them at the right time; name them clearly.
+//
+//   @section(".init.text")
+//   pub func <name>_init() -> int32 { ... return MODULE_OK }
+//
+//   @section(".exit.text")
+//   pub func <name>_exit() -> void { ... }
+//
+// The build glue (Phase 18) will emit the module_init/module_exit pointer
+// tables that reference these by name, the way the C macros do.
+
+// THIS_MODULE is a pointer to the module's own `struct module`, needed for the
+// `owner` field of file_operations. The kernel build provides the symbol;
+// bind it as an extern global when codegen supports extern statics.
+extern "C" func stenopos_this_module() -> ptr[uint8]

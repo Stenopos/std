@@ -1,0 +1,41 @@
+// Stenopos standard library — kernel.chrdev
+// Character-device registration and the VFS callback table.
+//
+// A character device exposes a /dev node that userspace can open, read, write,
+// and close. You fill in a `FileOperations` table with your handlers and hand
+// it to register_chrdev; the kernel calls back into your handlers.
+
+module kernel.chrdev
+
+// struct file_operations — the kernel's VFS callback table.
+//
+// The real struct has ~30 fields; this @repr("C") layout matches the ABI for
+// the handlers a simple driver sets (owner/read/write/open/release). Leave the
+// slots you don't use as null (zeroed()), exactly like a C designated
+// initializer that only fills a few members.
+@repr("C")
+struct FileOperations {
+    ptr[uint8] owner            // THIS_MODULE
+    ptr[uint8] llseek
+    ptr[uint8] read             // ssize_t (*)(struct file*, char __user*, size_t, loff_t*)
+    ptr[uint8] write            // ssize_t (*)(struct file*, const char __user*, size_t, loff_t*)
+    ptr[uint8] read_iter
+    ptr[uint8] write_iter
+    ptr[uint8] iopoll
+    ptr[uint8] iterate_shared
+    ptr[uint8] poll
+    ptr[uint8] unlocked_ioctl
+    ptr[uint8] compat_ioctl
+    ptr[uint8] mmap
+    ptr[uint8] open             // int (*)(struct inode*, struct file*)
+    ptr[uint8] flush
+    ptr[uint8] release          // int (*)(struct inode*, struct file*)
+}
+
+// Register a character device. Pass major = 0 to let the kernel allocate a
+// free major number; the return value is then the assigned major (>= 0), or a
+// negative errno on failure.
+extern "C" func register_chrdev(uint32 major, str name, ptr[FileOperations] fops) -> int32
+
+// Release a character device registered with register_chrdev.
+extern "C" func unregister_chrdev(uint32 major, str name) -> void

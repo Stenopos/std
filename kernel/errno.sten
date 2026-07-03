@@ -1,0 +1,34 @@
+// Stenopos standard library — kernel.errno
+// Standard Linux error codes, as the NEGATIVE values kernel functions return.
+//
+// Kernel functions signal failure by returning `-Exxx` (e.g. a read handler
+// returns -EFAULT if copy_to_user fails). Userspace then sees errno = Exxx.
+// Use these constants instead of magic numbers like `-14`.
+
+module kernel.errno
+
+const int32 EPERM   = -1    // Operation not permitted
+const int32 ENOENT  = -2    // No such file or directory
+const int32 ESRCH   = -3    // No such process
+const int32 EINTR   = -4    // Interrupted system call
+const int32 EIO     = -5    // I/O error
+const int32 ENXIO   = -6    // No such device or address
+const int32 E2BIG   = -7    // Argument list too long
+const int32 EBADF   = -9    // Bad file number
+const int32 EAGAIN  = -11   // Try again
+const int32 ENOMEM  = -12   // Out of memory
+const int32 EACCES  = -13   // Permission denied
+const int32 EFAULT  = -14   // Bad address (e.g. copy_to_user failed)
+const int32 EBUSY   = -16   // Device or resource busy
+const int32 EEXIST  = -17   // File exists
+const int32 ENODEV  = -19   // No such device
+const int32 ENOTDIR = -20   // Not a directory
+const int32 EISDIR  = -21   // Is a directory
+const int32 EINVAL  = -22   // Invalid argument
+const int32 ENFILE  = -23   // File table overflow
+const int32 EMFILE  = -24   // Too many open files
+const int32 ENOSPC  = -28   // No space left on device
+const int32 EROFS   = -30   // Read-only file system
+const int32 EPIPE   = -32   // Broken pipe
+const int32 ERANGE  = -34   // Math result not representable
+const int32 ENOSYS  = -38   // Function not implemented

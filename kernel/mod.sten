@@ -1,0 +1,37 @@
+// Stenopos standard library — kernel module
+// Thin FFI bindings for writing Linux loadable kernel modules (LKMs).
+//
+// This is a WRAPPER around the kernel's C ABI, not a reimplementation of the
+// kernel. It declares the kernel symbols an LKM links against (printk,
+// copy_to_user, register_chrdev, ...) and the C-layout structs they need, so
+// module authors write against Stenopos instead of re-declaring externs in
+// every file.
+//
+// Status: designed — emitting a real .ko needs freestanding kernel-ABI
+// codegen and the kernel's Kbuild system (see ROADMAP Phase 18). The bindings
+// below are the intended surface.
+//
+// Submodules:
+//   kernel.errno    — standard negative errno constants (-EFAULT, -EBUSY, ...)
+//   kernel.printk   — printk + pr_info/pr_warn/pr_err/pr_debug log helpers
+//   kernel.uaccess  — copy_to_user / copy_from_user and safe helpers
+//   kernel.chrdev   — struct file_operations, register/unregister_chrdev
+//   kernel.module   — module lifecycle + metadata (license, author, version)
+//
+// A minimal module looks like:
+//
+//   import kernel.printk.{pr_info}
+//   import kernel.module.{ModuleResult, MODULE_OK}
+//
+//   @section(".init.text")
+//   pub func my_init() -> int32 {
+//       pr_info("hello from a Stenopos module")
+//       return MODULE_OK
+//   }
+//
+//   @section(".exit.text")
+//   pub func my_exit() -> void {
+//       pr_info("goodbye")
+//   }
+
+module kernel

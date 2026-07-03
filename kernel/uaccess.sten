@@ -1,0 +1,28 @@
+// Stenopos standard library — kernel.uaccess
+// Safe transfer of data between kernel space and user space.
+//
+// A user-space pointer must NEVER be dereferenced directly in the kernel — it
+// belongs to another address space and may be invalid or malicious. All
+// transfers go through copy_to_user / copy_from_user, which validate the user
+// pointer and handle page faults.
+//
+// Both functions return the number of bytes that could NOT be copied: 0 means
+// full success. The `*_ok` helpers wrap that into a bool.
+
+module kernel.uaccess
+
+// Copy `n` bytes from kernel `from` to user `to`. Returns bytes NOT copied.
+extern "C" func copy_to_user(ptr[uint8] to, ptr[uint8] from, uint64 n) -> uint64
+
+// Copy `n` bytes from user `from` to kernel `to`. Returns bytes NOT copied.
+extern "C" func copy_from_user(ptr[uint8] to, ptr[uint8] from, uint64 n) -> uint64
+
+// True if the whole buffer copied to user space successfully.
+func copy_to_user_ok(ptr[uint8] to, ptr[uint8] from, uint64 n) -> bool {
+    return copy_to_user(to, from, n) == 0
+}
+
+// True if the whole buffer copied from user space successfully.
+func copy_from_user_ok(ptr[uint8] to, ptr[uint8] from, uint64 n) -> bool {
+    return copy_from_user(to, from, n) == 0
+}

@@ -1,0 +1,47 @@
+// Stenopos standard library — kernel.printk
+// The kernel's logging primitive and log-level helpers.
+//
+// printk is like printf but writes to the kernel ring buffer (read with
+// `dmesg`). Each message carries a log level via a leading prefix; in C that
+// is the KERN_INFO / KERN_ERR macros, which expand to "\001" plus a digit.
+// The pr_* helpers below prepend the right prefix so callers don't have to.
+
+module kernel.printk
+
+// The core kernel logging function (variadic, printf-style format).
+extern "C" func printk(str fmt, ...) -> int32
+
+// Log-level prefixes. "\001" is KERN_SOH (start of header); the digit selects
+// the level: 0=emerg ... 7=debug.
+const str KERN_EMERG   = "\0010"   // system is unusable
+const str KERN_ALERT   = "\0011"   // action must be taken immediately
+const str KERN_CRIT    = "\0012"   // critical conditions
+const str KERN_ERR     = "\0013"   // error conditions
+const str KERN_WARNING = "\0014"   // warning conditions
+const str KERN_NOTICE  = "\0015"   // normal but significant
+const str KERN_INFO    = "\0016"   // informational
+const str KERN_DEBUG   = "\0017"   // debug-level messages
+
+// Convenience wrappers that append a newline and the right level prefix.
+// (Format arguments are omitted here; pass a preformatted string, or call
+// printk directly when you need format specifiers.)
+
+func pr_info(str msg) -> void {
+    printk("{KERN_INFO}{msg}\n")
+}
+
+func pr_notice(str msg) -> void {
+    printk("{KERN_NOTICE}{msg}\n")
+}
+
+func pr_warn(str msg) -> void {
+    printk("{KERN_WARNING}{msg}\n")
+}
+
+func pr_err(str msg) -> void {
+    printk("{KERN_ERR}{msg}\n")
+}
+
+func pr_debug(str msg) -> void {
+    printk("{KERN_DEBUG}{msg}\n")
+}

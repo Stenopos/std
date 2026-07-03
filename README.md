@@ -10,6 +10,7 @@ The standard library for the [Stenopos programming language](https://stenopos.gi
 | `collections` | Lists, maps, sets | In development |
 | `math` | Math functions and constants | In development |
 | `string` | String utilities | In development |
+| `kernel` | Linux kernel-module FFI bindings (printk, uaccess, chrdev, errno) | Designed |
 
 ## Using the standard library
 
@@ -35,6 +36,34 @@ str l = s.to_lower()
 str t = s.trim()
 str r = s.replace("World", "Stenopos")
 ```
+
+## Writing a Linux kernel module
+
+The `kernel` module wraps the C kernel ABI (it does not reimplement the
+kernel). Import the pieces you need instead of re-declaring externs:
+
+```stenopos
+import kernel.printk.{pr_info}
+import kernel.uaccess.{copy_to_user_ok}
+import kernel.chrdev.{FileOperations, register_chrdev}
+import kernel.errno.{EFAULT}
+import kernel.module.MODULE_OK
+
+@section(".init.text")
+pub func hello_init() -> int32 {
+    pr_info("hello from a Stenopos module")
+    return MODULE_OK
+}
+
+@section(".exit.text")
+pub func hello_exit() -> void {
+    pr_info("goodbye")
+}
+```
+
+See `examples/showcase/kernel_module.sten` for a complete character device.
+Building a real `.ko` needs freestanding kernel-ABI codegen + Kbuild (roadmap
+Phase 18); the bindings define the intended surface today.
 
 ## Contributing
 
