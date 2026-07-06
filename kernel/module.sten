@@ -26,14 +26,19 @@ const int32 MODULE_OK = 0        // loaded successfully
 //   @section(".modinfo")
 //   const str VERSION = "version=1.0"
 
-// Convention for the entry points. Mark your init/exit functions with these
-// sections so the loader runs them at the right time; name them clearly.
+// Entry points. Mark your init/exit functions with @module_init / @module_exit
+// — the same names you know from the Linux kernel. The compiler expands them to
+// the correct ELF section placement (.init.text / .exit.text), so you don't
+// have to remember the section strings:
 //
-//   @section(".init.text")
+//   @module_init
 //   pub func <name>_init() -> int32 { ... return MODULE_OK }
 //
-//   @section(".exit.text")
+//   @module_exit
 //   pub func <name>_exit() -> void { ... }
+//
+// (If you ever need a different section, the underlying @section(".name") still
+// works — @module_init is just sugar for @section(".init.text").)
 //
 // The build glue (Phase 18) will emit the module_init/module_exit pointer
 // tables that reference these by name, the way the C macros do.
