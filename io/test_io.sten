@@ -1,0 +1,70 @@
+// Tests for std.io — run with:
+//   stenopos-cli run std/io/test_io.sten
+// Uses a scratch file under /tmp. Prints ok/FAIL lines and a summary.
+
+module std.io.tests
+
+import std.io.{read_lines, write_lines, append_file}
+
+func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   {name}")
+        return 0
+    }
+    println("  FAIL {name}")
+    return 1
+}
+
+func test_roundtrip(str path) -> int32 {
+    int32 fails = 0
+    List[str] lines = list_new()
+    lines.push("alpha")
+    lines.push("beta")
+    lines.push("gamma")
+    fails += expect(write_lines(path, lines), "write_lines succeeds")
+
+    List[str] back = read_lines(path)
+    fails += expect(back.len() == 3, "read_lines count")
+    fails += expect(back.get(0) == "alpha", "read_lines first")
+    fails += expect(back.get(2) == "gamma", "read_lines last")
+
+    str raw = read_file(path)
+    fails += expect(raw == "alpha\nbeta\ngamma\n", "trailing newline written")
+    return fails
+}
+
+func test_append(str path) -> int32 {
+    int32 fails = 0
+    fails += expect(append_file(path, "delta\n"), "append_file succeeds")
+    List[str] back = read_lines(path)
+    fails += expect(back.len() == 4, "append adds a line")
+    fails += expect(back.get(3) == "delta", "appended content")
+
+    str fresh = "/tmp/stenopos_std_io_test_fresh.txt"
+    bool wiped = write_file(fresh, "")
+    fails += expect(wiped, "reset fresh file")
+    fails += expect(append_file(fresh, "first\n"), "append creates content")
+    List[str] one = read_lines(fresh)
+    fails += expect(one.len() == 1 && one.get(0) == "first", "append to empty file")
+    return fails
+}
+
+func test_missing_file() -> int32 {
+    int32 fails = 0
+    List[str] none = read_lines("/tmp/stenopos_std_io_test_definitely_missing.txt")
+    fails += expect(none.len() == 0, "read_lines missing file -> empty")
+    return fails
+}
+
+func main() -> void {
+    int32 fails = 0
+    str path = "/tmp/stenopos_std_io_test.txt"
+    println("std.io tests:")
+    fails += test_roundtrip(path)
+    fails += test_append(path)
+    fails += test_missing_file()
+    if (fails > 0) {
+        fail("FAIL: {fails} check(s) failed")
+    }
+    println("PASS: all std.io checks passed")
+}

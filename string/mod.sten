@@ -1,48 +1,281 @@
 // Stenopos standard library — string module
-// String utilities beyond the built-in methods
+// String utilities beyond the built-in methods (len, byte_at, substring,
+// concatenation with +, == / != comparison).
+//
+// Byte-oriented: all positions and widths count bytes, and the case and
+// classification helpers are ASCII-only. Unicode-aware versions come later.
 
-module string
+module std.string
 
-// Split a string by a delimiter, returning an array of parts.
-// Example: split("a,b,c", ",") -> ["a", "b", "c"]
-func split(str s, str delim) -> str[] {
-    // TODO: implement
-    return []
+// ---------------------------------------------------------------------------
+// Character (byte) classification — take the int32 code from str.byte_at()
+// ---------------------------------------------------------------------------
+
+// True for ASCII whitespace: space, tab, newline, carriage return.
+pub func is_space(int32 c) -> bool {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r'
 }
 
-// Join an array of strings with a separator.
-// Example: join(["a", "b", "c"], ",") -> "a,b,c"
-func join(str[] parts, str sep) -> str {
-    // TODO: implement
-    return ""
+// True for ASCII digits '0'..'9'.
+pub func is_digit(int32 c) -> bool {
+    return c >= '0' && c <= '9'
 }
 
-// Repeat a string n times.
-// Example: repeat("ab", 3) -> "ababab"
-func repeat(str s, int32 n) -> str {
-    // TODO: implement
-    return ""
+// True for ASCII lowercase letters 'a'..'z'.
+pub func is_lower(int32 c) -> bool {
+    return c >= 'a' && c <= 'z'
 }
 
-// Check if a string is empty (zero length).
-func is_empty(str s) -> bool {
+// True for ASCII uppercase letters 'A'..'Z'.
+pub func is_upper(int32 c) -> bool {
+    return c >= 'A' && c <= 'Z'
+}
+
+// True for ASCII letters.
+pub func is_alpha(int32 c) -> bool {
+    return is_lower(c) || is_upper(c)
+}
+
+// True for ASCII letters or digits.
+pub func is_alnum(int32 c) -> bool {
+    return is_alpha(c) || is_digit(c)
+}
+
+// ---------------------------------------------------------------------------
+// Queries
+// ---------------------------------------------------------------------------
+
+// True when the string has zero length.
+pub func is_empty(str s) -> bool {
     return s.len() == 0
 }
 
-// Pad a string on the left to a given width with a fill character.
-func pad_left(str s, int32 width, str fill) -> str {
-    // TODO: implement
-    return s
+// True when `needle` occurs in `s` starting exactly at byte offset `pos`.
+// Out-of-range positions return false.
+pub func matches_at(str s, str needle, int64 pos) -> bool {
+    int64 m = needle.len()
+    if (pos < 0 || pos + m > s.len()) {
+        return false
+    }
+    int64 j = 0
+    while (j < m) {
+        if (s.byte_at(pos + j) != needle.byte_at(j)) {
+            return false
+        }
+        j += 1
+    }
+    return true
 }
 
-// Pad a string on the right to a given width with a fill character.
-func pad_right(str s, int32 width, str fill) -> str {
-    // TODO: implement
-    return s
+// True when `s` begins with `prefix`. Every string starts with "".
+pub func starts_with(str s, str prefix) -> bool {
+    return matches_at(s, prefix, 0)
 }
 
-// Count occurrences of a substring.
-func count(str s, str sub) -> int32 {
-    // TODO: implement
-    return 0
+// True when `s` ends with `suffix`. Every string ends with "".
+pub func ends_with(str s, str suffix) -> bool {
+    return matches_at(s, suffix, s.len() - suffix.len())
+}
+
+// Byte offset of the first occurrence of `needle` in `s`, or -1 if absent.
+// An empty needle is found at offset 0.
+pub func index_of(str s, str needle) -> int64 {
+    // (-1 is built from a variable because negative int literals currently
+    // lower as int32 even in int64 contexts — see language notes)
+    int64 not_found = 0
+    not_found -= 1
+    int64 n = s.len()
+    int64 m = needle.len()
+    if (m > n) {
+        return not_found
+    }
+    int64 i = 0
+    while (i <= n - m) {
+        if (matches_at(s, needle, i)) {
+            return i
+        }
+        i += 1
+    }
+    return not_found
+}
+
+// True when `needle` occurs anywhere in `s`.
+pub func contains(str s, str needle) -> bool {
+    return index_of(s, needle) >= 0
+}
+
+// Number of non-overlapping occurrences of `sub` in `s`.
+// count("aaaa", "aa") is 2. An empty `sub` counts 0.
+pub func count(str s, str sub) -> int32 {
+    int64 m = sub.len()
+    if (m == 0) {
+        return 0
+    }
+    int32 hits = 0
+    int64 i = 0
+    int64 n = s.len()
+    while (i + m <= n) {
+        if (matches_at(s, sub, i)) {
+            hits += 1
+            i += m
+        } else {
+            i += 1
+        }
+    }
+    return hits
+}
+
+// ---------------------------------------------------------------------------
+// Transformations — every function returns a fresh owned string
+// ---------------------------------------------------------------------------
+
+// Split `s` on every occurrence of `delim`.
+// split("a,,b", ",") -> ["a", "", "b"]. An empty delimiter yields [s].
+pub func split(str s, str delim) -> List[str] {
+    List[str] parts = list_new()
+    int64 m = delim.len()
+    int64 n = s.len()
+    if (m == 0) {
+        parts.push(s.substring(0, n))
+        return parts
+    }
+    int64 start = 0
+    int64 i = 0
+    while (i + m <= n) {
+        if (matches_at(s, delim, i)) {
+            parts.push(s.substring(start, i))
+            i += m
+            start = i
+        } else {
+            i += 1
+        }
+    }
+    parts.push(s.substring(start, n))
+    return parts
+}
+
+// Join a list of strings with a separator between elements.
+// join(["a", "b", "c"], ", ") -> "a, b, c".
+pub func join(List[str] parts, str sep) -> str {
+    List[str] out = list_new()
+    int64 n = parts.len()
+    int64 i = 0
+    while (i < n) {
+        if (i > 0) {
+            out.push(sep)
+        }
+        out.push(parts.get(i))
+        i += 1
+    }
+    return out.join()
+}
+
+// Repeat `s` `n` times. n <= 0 yields "".
+// (Named repeat_str because `repeat` is a reserved word in the host parser.)
+pub func repeat_str(str s, int32 n) -> str {
+    List[str] parts = list_new()
+    int32 i = 0
+    while (i < n) {
+        parts.push(s)
+        i += 1
+    }
+    return parts.join()
+}
+
+// Copy of `s` without leading ASCII whitespace.
+pub func trim_start(str s) -> str {
+    int64 n = s.len()
+    int64 i = 0
+    while (i < n && is_space(s.byte_at(i))) {
+        i += 1
+    }
+    return s.substring(i, n)
+}
+
+// Copy of `s` without trailing ASCII whitespace.
+pub func trim_end(str s) -> str {
+    int64 n = s.len()
+    while (n > 0 && is_space(s.byte_at(n - 1))) {
+        n -= 1
+    }
+    return s.substring(0, n)
+}
+
+// Copy of `s` without leading or trailing ASCII whitespace.
+pub func trim(str s) -> str {
+    return trim_start(trim_end(s))
+}
+
+// Copy of `s` with ASCII lowercase letters uppercased.
+pub func to_upper(str s) -> str {
+    str table = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    List[str] parts = list_new()
+    int64 n = s.len()
+    int64 i = 0
+    while (i < n) {
+        int32 c = s.byte_at(i)
+        if (is_lower(c)) {
+            int64 k = cast[int64](c - 'a')
+            parts.push(table.substring(k, k + 1))
+        } else {
+            parts.push(s.substring(i, i + 1))
+        }
+        i += 1
+    }
+    return parts.join()
+}
+
+// Copy of `s` with ASCII uppercase letters lowercased.
+pub func to_lower(str s) -> str {
+    str table = "abcdefghijklmnopqrstuvwxyz"
+    List[str] parts = list_new()
+    int64 n = s.len()
+    int64 i = 0
+    while (i < n) {
+        int32 c = s.byte_at(i)
+        if (is_upper(c)) {
+            int64 k = cast[int64](c - 'A')
+            parts.push(table.substring(k, k + 1))
+        } else {
+            parts.push(s.substring(i, i + 1))
+        }
+        i += 1
+    }
+    return parts.join()
+}
+
+// Pad on the left with the first byte of `fill` until `s` is `width` bytes.
+// Strings already at least `width` bytes come back unchanged.
+pub func pad_left(str s, int64 width, str fill) -> str {
+    int64 n = s.len()
+    if (n >= width || fill.len() == 0) {
+        return s.substring(0, n)
+    }
+    str f = fill.substring(0, 1)
+    List[str] parts = list_new()
+    int64 i = n
+    while (i < width) {
+        parts.push(f)
+        i += 1
+    }
+    parts.push(s)
+    return parts.join()
+}
+
+// Pad on the right with the first byte of `fill` until `s` is `width` bytes.
+// Strings already at least `width` bytes come back unchanged.
+pub func pad_right(str s, int64 width, str fill) -> str {
+    int64 n = s.len()
+    if (n >= width || fill.len() == 0) {
+        return s.substring(0, n)
+    }
+    str f = fill.substring(0, 1)
+    List[str] parts = list_new()
+    parts.push(s)
+    int64 i = n
+    while (i < width) {
+        parts.push(f)
+        i += 1
+    }
+    return parts.join()
 }

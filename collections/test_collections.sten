@@ -1,0 +1,124 @@
+// Tests for std.collections — run with:
+//   stenopos-cli run std/collections/test_collections.sten
+// Prints one ok/FAIL line per check and a PASS/FAIL summary.
+
+module std.collections.tests
+
+import std.collections.{range, repeat_i32, concat_i32, slice_i32}
+import std.collections.{sum_i32, sum_i64, sum_f64, min_of_i32, max_of_i32, min_of_f64, max_of_f64}
+import std.collections.{count_i32, count_str}
+
+func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   {name}")
+        return 0
+    }
+    println("  FAIL {name}")
+    return 1
+}
+
+func near(float64 a, float64 b) -> bool {
+    float64 d = a - b
+    if (d < 0.0) {
+        d = 0.0 - d
+    }
+    return d < 0.000001
+}
+
+func test_building() -> int32 {
+    int32 fails = 0
+    List[int32] r = range(2, 5)
+    fails += expect(r.len() == 3, "range length")
+    fails += expect(r.get(0) == 2 && r.get(2) == 4, "range values")
+    List[int32] empty = range(5, 5)
+    fails += expect(empty.len() == 0, "range empty")
+    List[int32] back = range(5, 2)
+    fails += expect(back.len() == 0, "range reversed is empty")
+
+    List[int32] sevens = repeat_i32(7, 4)
+    fails += expect(sevens.len() == 4, "repeat_i32 length")
+    fails += expect(sevens.get(0) == 7 && sevens.get(3) == 7, "repeat_i32 values")
+    fails += expect(repeat_i32(1, 0).len() == 0, "repeat_i32 zero")
+
+    List[int32] ab = concat_i32(range(0, 3), range(10, 12))
+    fails += expect(ab.len() == 5, "concat_i32 length")
+    fails += expect(ab.get(2) == 2 && ab.get(3) == 10, "concat_i32 seam")
+
+    List[int32] xs = range(0, 10)
+    List[int32] mid = slice_i32(xs, 3, 6)
+    fails += expect(mid.len() == 3, "slice_i32 length")
+    fails += expect(mid.get(0) == 3 && mid.get(2) == 5, "slice_i32 values")
+    List[int32] all = slice_i32(xs, 0, 999)
+    fails += expect(all.len() == 10, "slice_i32 clamps hi")
+    fails += expect(xs.len() == 10, "slice_i32 leaves source intact")
+    return fails
+}
+
+func test_aggregation() -> int32 {
+    int32 fails = 0
+    List[int32] xs = range(1, 5)
+    fails += expect(sum_i32(xs) == 10, "sum_i32")
+    List[int32] none = list_new()
+    fails += expect(sum_i32(none) == 0, "sum_i32 empty")
+
+    List[int64] big = list_new()
+    big.push(9000000000)
+    big.push(1)
+    fails += expect(sum_i64(big) == 9000000001, "sum_i64 beyond int32")
+
+    List[float64] fs = list_new()
+    fs.push(1.5)
+    fs.push(2.25)
+    fails += expect(near(sum_f64(fs), 3.75), "sum_f64")
+    fails += expect(near(min_of_f64(fs), 1.5), "min_of_f64")
+    fails += expect(near(max_of_f64(fs), 2.25), "max_of_f64")
+
+    List[int32] mix = list_new()
+    mix.push(3)
+    mix.push(-7)
+    mix.push(20)
+    mix.push(0)
+    fails += expect(min_of_i32(mix) == -7, "min_of_i32")
+    fails += expect(max_of_i32(mix) == 20, "max_of_i32")
+
+    int32 caught = 0
+    try {
+        int32 bad = min_of_i32(none)
+        println("  unreachable {bad}")
+    } catch (Error err) {
+        caught = 1
+    }
+    fails += expect(caught == 1, "min_of_i32 empty throws")
+    return fails
+}
+
+func test_counting() -> int32 {
+    int32 fails = 0
+    List[int32] xs = list_new()
+    xs.push(1)
+    xs.push(2)
+    xs.push(1)
+    xs.push(1)
+    fails += expect(count_i32(xs, 1) == 3, "count_i32 hits")
+    fails += expect(count_i32(xs, 9) == 0, "count_i32 none")
+
+    List[str] words = list_new()
+    words.push("stenopos")
+    words.push("hawk")
+    words.push("stenopos")
+    fails += expect(count_str(words, "stenopos") == 2, "count_str hits")
+    fails += expect(count_str(words, "owl") == 0, "count_str none")
+    return fails
+}
+
+func main() -> void {
+    int32 fails = 0
+    println("std.collections tests:")
+    fails += test_building()
+    fails += test_aggregation()
+    fails += test_counting()
+    if (fails > 0) {
+        fail("FAIL: {fails} check(s) failed")
+    }
+    println("PASS: all std.collections checks passed")
+}

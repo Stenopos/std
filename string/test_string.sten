@@ -1,0 +1,124 @@
+// Tests for std.string — run with:
+//   stenopos-cli run std/string/test_string.sten
+// Prints one ok/FAIL line per check and a PASS/FAIL summary.
+
+module std.string.tests
+
+import std.string.{is_space, is_digit, is_alpha, is_alnum, is_upper, is_lower}
+import std.string.{is_empty, matches_at, starts_with, ends_with, index_of, contains, count}
+import std.string.{split, join, repeat_str, trim, trim_start, trim_end}
+import std.string.{to_upper, to_lower, pad_left, pad_right}
+
+func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   {name}")
+        return 0
+    }
+    println("  FAIL {name}")
+    return 1
+}
+
+func expect_str(str got, str want, str name) -> int32 {
+    if (got == want) {
+        return expect(true, name)
+    }
+    println("  FAIL {name}: got '{got}', want '{want}'")
+    return 1
+}
+
+func test_classification() -> int32 {
+    int32 fails = 0
+    fails += expect(is_space(' ') && is_space('\t') && is_space('\n'), "is_space accepts whitespace")
+    fails += expect(!is_space('x'), "is_space rejects letters")
+    fails += expect(is_digit('0') && is_digit('9'), "is_digit accepts digits")
+    fails += expect(!is_digit('a'), "is_digit rejects letters")
+    fails += expect(is_lower('a') && !is_lower('A'), "is_lower")
+    fails += expect(is_upper('Z') && !is_upper('z'), "is_upper")
+    fails += expect(is_alpha('q') && is_alpha('Q') && !is_alpha('5'), "is_alpha")
+    fails += expect(is_alnum('q') && is_alnum('5') && !is_alnum('_'), "is_alnum")
+    return fails
+}
+
+func test_queries() -> int32 {
+    int32 fails = 0
+    fails += expect(is_empty("") && !is_empty("x"), "is_empty")
+    fails += expect(matches_at("hello", "ell", 1), "matches_at hit")
+    fails += expect(!matches_at("hello", "ell", 2), "matches_at miss")
+    fails += expect(!matches_at("hi", "hello", 0), "matches_at needle too long")
+    fails += expect(starts_with("stenopos", "sten"), "starts_with hit")
+    fails += expect(!starts_with("stenopos", "str"), "starts_with miss")
+    fails += expect(starts_with("stenopos", ""), "starts_with empty prefix")
+    fails += expect(ends_with("stenopos", "rel"), "ends_with hit")
+    fails += expect(!ends_with("stenopos", "sten"), "ends_with miss")
+    fails += expect(ends_with("stenopos", ""), "ends_with empty suffix")
+    fails += expect(index_of("abcabc", "bc") == 1, "index_of first hit")
+    // (compared with < 0 instead of == -1: negative literals currently lower
+    // as int32 even in int64 contexts, which trips llc — see report)
+    fails += expect(index_of("abcabc", "zz") < 0, "index_of miss")
+    fails += expect(index_of("abc", "") == 0, "index_of empty needle")
+    fails += expect(contains("systems language", "lang"), "contains hit")
+    fails += expect(!contains("systems language", "LANG"), "contains is case-sensitive")
+    fails += expect(count("aaaa", "aa") == 2, "count non-overlapping")
+    fails += expect(count("a,b,c", ",") == 2, "count separators")
+    fails += expect(count("abc", "") == 0, "count empty sub is 0")
+    return fails
+}
+
+func test_split_join() -> int32 {
+    int32 fails = 0
+    List[str] parts = split("a,b,c", ",")
+    fails += expect(parts.len() == 3, "split count")
+    fails += expect_str(parts.get(0), "a", "split part 0")
+    fails += expect_str(parts.get(2), "c", "split part 2")
+
+    List[str] gaps = split("a,,b", ",")
+    fails += expect(gaps.len() == 3, "split keeps empty middle")
+    fails += expect_str(gaps.get(1), "", "split empty middle value")
+
+    List[str] whole = split("abc", ";")
+    fails += expect(whole.len() == 1, "split no delimiter -> one part")
+    fails += expect_str(whole.get(0), "abc", "split no delimiter value")
+
+    List[str] wide = split("a::b::c", "::")
+    fails += expect(wide.len() == 3, "split multi-byte delim")
+    fails += expect_str(wide.get(1), "b", "split multi-byte middle")
+
+    fails += expect_str(join(parts, "-"), "a-b-c", "join with separator")
+    List[str] one = list_new()
+    one.push("solo")
+    fails += expect_str(join(one, ", "), "solo", "join single element")
+    List[str] none = list_new()
+    fails += expect_str(join(none, ","), "", "join empty list")
+    return fails
+}
+
+func test_transformations() -> int32 {
+    int32 fails = 0
+    fails += expect_str(repeat_str("ab", 3), "ababab", "repeat_str")
+    fails += expect_str(repeat_str("x", 0), "", "repeat_str zero")
+    fails += expect_str(trim_start("  hi "), "hi ", "trim_start")
+    fails += expect_str(trim_end("  hi \n"), "  hi", "trim_end")
+    fails += expect_str(trim("\t hi \n"), "hi", "trim")
+    fails += expect_str(trim("   "), "", "trim all-space")
+    fails += expect_str(trim("hi"), "hi", "trim no-op")
+    fails += expect_str(to_upper("Stenopos v1!"), "STENOPOS V1!", "to_upper")
+    fails += expect_str(to_lower("Stenopos V1!"), "stenopos v1!", "to_lower")
+    fails += expect_str(pad_left("7", 3, "0"), "007", "pad_left")
+    fails += expect_str(pad_left("1234", 3, "0"), "1234", "pad_left already wide")
+    fails += expect_str(pad_right("ab", 5, "."), "ab...", "pad_right")
+    fails += expect_str(pad_right("ab", 2, "."), "ab", "pad_right exact width")
+    return fails
+}
+
+func main() -> void {
+    int32 fails = 0
+    println("std.string tests:")
+    fails += test_classification()
+    fails += test_queries()
+    fails += test_split_join()
+    fails += test_transformations()
+    if (fails > 0) {
+        fail("FAIL: {fails} check(s) failed")
+    }
+    println("PASS: all std.string checks passed")
+}

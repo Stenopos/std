@@ -1,39 +1,52 @@
 // Stenopos standard library — io module
-// File and console I/O
+// Line-oriented helpers over the built-in file I/O.
+//
+// The compiler already provides read_file(path) -> str and
+// write_file(path, content) -> bool as built-ins; this module adds the
+// line-based conveniences on top. Note: read_file returns "" for a missing
+// file (there is no error to catch yet), so an empty and an absent file look
+// the same. exists()/stdin/stderr helpers wait on runtime support.
 
-module io
+module std.io
 
-// Read the entire contents of a file as a string.
-// Raises IOError if the file cannot be opened or read.
-func read_file(str path) -> str {
-    // TODO: implement
-    return ""
+// Read a file and split it into lines (separated by '\n').
+// A trailing newline does not produce a final empty line.
+// A missing or empty file yields an empty list.
+pub func read_lines(str path) -> List[str] {
+    List[str] lines = list_new()
+    str content = read_file(path)
+    int64 n = content.len()
+    int64 start = 0
+    int64 i = 0
+    while (i < n) {
+        if (content.byte_at(i) == '\n') {
+            lines.push(content.substring(start, i))
+            start = i + 1
+        }
+        i += 1
+    }
+    if (start < n) {
+        lines.push(content.substring(start, n))
+    }
+    return lines
 }
 
-// Write a string to a file, creating it if it does not exist.
-// Raises IOError if the file cannot be written.
-func write_file(str path, str content) -> void {
-    // TODO: implement
+// Write a list of lines to a file, one per line, with a trailing newline.
+// Returns true when the write succeeded.
+pub func write_lines(str path, List[str] lines) -> bool {
+    List[str] parts = list_new()
+    for (line in lines) {
+        parts.push(line)
+        parts.push("\n")
+    }
+    return write_file(path, parts.join())
 }
 
-// Append a string to a file.
-func append_file(str path, str content) -> void {
-    // TODO: implement
-}
-
-// Read a line from standard input.
-func read_line() -> str {
-    // TODO: implement
-    return ""
-}
-
-// Print to standard output with a newline.
-func println(str s) -> void {
-    printf("{s}\n")
-}
-
-// Print to standard error.
-func eprintln(str s) -> void {
-    // TODO: implement using stderr
-    printf("{s}\n")
+// Append `content` to the end of a file, creating the file if absent.
+// Returns true when the write succeeded.
+// (Implemented as read + rewrite until the runtime grows an append mode —
+// fine for small files, not for logs written in a loop.)
+pub func append_file(str path, str content) -> bool {
+    str combined = read_file(path) + content
+    return write_file(path, combined)
 }

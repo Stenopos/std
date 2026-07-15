@@ -1,0 +1,130 @@
+// Tests for std.math — run with:
+//   stenopos-cli run std/math/test_math.sten
+// Prints one ok/FAIL line per check and a PASS/FAIL summary.
+
+module std.math.tests
+
+import std.math.{pi, e, tau, abs_i32, abs_i64, abs_f64, sign_i32, sign_i64, sign_f64}
+import std.math.{min, max, clamp, is_even, is_odd, pow_int, gcd, lcm}
+import std.math.{floor, ceil, round, sqrt}
+
+func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   {name}")
+        return 0
+    }
+    println("  FAIL {name}")
+    return 1
+}
+
+// True when a and b differ by less than eps in either direction.
+func approx(float64 a, float64 b, float64 eps) -> bool {
+    return abs_f64(a - b) < eps
+}
+
+func test_constants() -> int32 {
+    int32 fails = 0
+    fails += expect(approx(pi(), 3.14159265, 0.0000001), "pi value")
+    fails += expect(approx(e(), 2.71828182, 0.0000001), "e value")
+    fails += expect(approx(tau(), 2.0 * pi(), 0.0000000001), "tau is 2*pi")
+    return fails
+}
+
+func test_abs_sign() -> int32 {
+    int32 fails = 0
+    int32 neg5 = -5
+    fails += expect(abs_i32(neg5) == 5 && abs_i32(5) == 5 && abs_i32(0) == 0, "abs_i32")
+    int64 big = 0
+    big -= 9000000000
+    fails += expect(abs_i64(big) == 9000000000, "abs_i64 beyond int32 range")
+    fails += expect(approx(abs_f64(-2.5), 2.5, 0.000001), "abs_f64 negative")
+    fails += expect(approx(abs_f64(2.5), 2.5, 0.000001), "abs_f64 positive")
+    fails += expect(sign_i32(42) == 1 && sign_i32(neg5) == -1 && sign_i32(0) == 0, "sign_i32")
+    int64 neg7 = 0
+    neg7 -= 7
+    fails += expect(sign_i64(7) == 1 && sign_i64(neg7) == -1 && sign_i64(0) == 0, "sign_i64")
+    fails += expect(sign_f64(0.5) == 1 && sign_f64(-0.5) == -1 && sign_f64(0.0) == 0, "sign_f64")
+    return fails
+}
+
+func test_min_max_clamp() -> int32 {
+    int32 fails = 0
+    fails += expect(min(3, 7) == 3 && max(3, 7) == 7, "min/max int32")
+    fails += expect(approx(min(1.5, 2.5), 1.5, 0.000001), "min float64")
+    fails += expect(approx(max(1.5, 2.5), 2.5, 0.000001), "max float64")
+    fails += expect(clamp(5, 0, 10) == 5, "clamp inside")
+    fails += expect(clamp(15, 0, 10) == 10, "clamp above")
+    int32 neg3 = -3
+    fails += expect(clamp(neg3, 0, 10) == 0, "clamp below")
+    fails += expect(approx(clamp(0.25, 0.0, 1.0), 0.25, 0.000001), "clamp float64")
+    return fails
+}
+
+func test_integer_math() -> int32 {
+    int32 fails = 0
+    int64 neg4 = 0
+    neg4 -= 4
+    int64 neg3 = 0
+    neg3 -= 3
+    fails += expect(is_even(4) && is_even(0) && is_even(neg4), "is_even")
+    fails += expect(is_odd(3) && is_odd(neg3) && !is_odd(4), "is_odd")
+    fails += expect(pow_int(2, 10) == 1024, "pow_int 2^10")
+    fails += expect(pow_int(7, 0) == 1, "pow_int exp 0")
+    fails += expect(pow_int(3, 4) == 81, "pow_int 3^4")
+    int32 caught = 0
+    try {
+        int64 bad = pow_int(2, -1)
+        println("  unreachable {bad}")
+    } catch (Error err) {
+        caught = 1
+    }
+    fails += expect(caught == 1, "pow_int negative exp throws")
+    fails += expect(gcd(12, 18) == 6, "gcd 12 18")
+    fails += expect(gcd(7, 13) == 1, "gcd coprime")
+    fails += expect(gcd(0, 5) == 5 && gcd(5, 0) == 5, "gcd with zero")
+    int64 neg12 = 0
+    neg12 -= 12
+    fails += expect(gcd(neg12, 18) == 6, "gcd negative input")
+    fails += expect(lcm(4, 6) == 12, "lcm 4 6")
+    fails += expect(lcm(0, 9) == 0, "lcm with zero")
+    return fails
+}
+
+func test_float_math() -> int32 {
+    int32 fails = 0
+    fails += expect(approx(floor(2.7), 2.0, 0.000001), "floor positive")
+    fails += expect(approx(floor(-2.1), -3.0, 0.000001), "floor negative")
+    fails += expect(approx(floor(4.0), 4.0, 0.000001), "floor whole")
+    fails += expect(approx(ceil(2.1), 3.0, 0.000001), "ceil positive")
+    fails += expect(approx(ceil(-2.7), -2.0, 0.000001), "ceil negative")
+    fails += expect(approx(round(2.4), 2.0, 0.000001), "round down")
+    fails += expect(approx(round(2.5), 3.0, 0.000001), "round half up")
+    fails += expect(approx(round(-2.5), -3.0, 0.000001), "round half away from zero")
+    fails += expect(approx(sqrt(4.0), 2.0, 0.000000001), "sqrt 4")
+    fails += expect(approx(sqrt(2.0), 1.4142135623730951, 0.000000001), "sqrt 2")
+    fails += expect(approx(sqrt(0.25), 0.5, 0.000000001), "sqrt below one")
+    fails += expect(approx(sqrt(0.0), 0.0, 0.000000001), "sqrt zero")
+    int32 caught = 0
+    try {
+        float64 bad = sqrt(-1.0)
+        println("  unreachable {bad}")
+    } catch (Error err) {
+        caught = 1
+    }
+    fails += expect(caught == 1, "sqrt negative throws")
+    return fails
+}
+
+func main() -> void {
+    int32 fails = 0
+    println("std.math tests:")
+    fails += test_constants()
+    fails += test_abs_sign()
+    fails += test_min_max_clamp()
+    fails += test_integer_math()
+    fails += test_float_math()
+    if (fails > 0) {
+        fail("FAIL: {fails} check(s) failed")
+    }
+    println("PASS: all std.math checks passed")
+}

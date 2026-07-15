@@ -1,64 +1,216 @@
 // Stenopos standard library — math module
-// Mathematical functions and constants
+// Pure-Stenopos math: no libm, no FFI. Constants are functions because the
+// language has no module-level constants yet.
 
-module math
+module std.math
 
-const float64 PI = 3.141592653589793
-const float64 E  = 2.718281828459045
-const float64 TAU = 6.283185307179586
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
-extern "C" func sqrt(float64 x) -> float64
-extern "C" func pow(float64 base, float64 exp) -> float64
-extern "C" func fabs(float64 x) -> float64
-extern "C" func floor(float64 x) -> float64
-extern "C" func ceil(float64 x) -> float64
-extern "C" func round(float64 x) -> float64
-extern "C" func log(float64 x) -> float64
-extern "C" func log2(float64 x) -> float64
-extern "C" func log10(float64 x) -> float64
-extern "C" func sin(float64 x) -> float64
-extern "C" func cos(float64 x) -> float64
-extern "C" func tan(float64 x) -> float64
+// The circle constant pi.
+pub func pi() -> float64 {
+    return 3.141592653589793
+}
 
-// Minimum of two int32 values
-func min_i32(int32 a, int32 b) -> int32 {
+// Euler's number e.
+pub func e() -> float64 {
+    return 2.718281828459045
+}
+
+// Tau = 2 * pi, one full turn in radians.
+pub func tau() -> float64 {
+    return 6.283185307179586
+}
+
+// ---------------------------------------------------------------------------
+// Absolute value and sign
+// ---------------------------------------------------------------------------
+
+// Absolute value of an int32. (Undefined for the minimum int32.)
+pub func abs_i32(int32 x) -> int32 {
+    if (x < 0) {
+        return 0 - x
+    }
+    return x
+}
+
+// Absolute value of an int64. (Undefined for the minimum int64.)
+pub func abs_i64(int64 x) -> int64 {
+    if (x < 0) {
+        return 0 - x
+    }
+    return x
+}
+
+// Absolute value of a float64.
+pub func abs_f64(float64 x) -> float64 {
+    if (x < 0.0) {
+        return 0.0 - x
+    }
+    return x
+}
+
+// -1, 0, or 1 depending on the sign of an int32.
+pub func sign_i32(int32 x) -> int32 {
+    if (x > 0) {
+        return 1
+    }
+    if (x < 0) {
+        return -1
+    }
+    return 0
+}
+
+// -1, 0, or 1 depending on the sign of an int64.
+pub func sign_i64(int64 x) -> int32 {
+    if (x > 0) {
+        return 1
+    }
+    if (x < 0) {
+        return -1
+    }
+    return 0
+}
+
+// -1, 0, or 1 depending on the sign of a float64. Zero maps to 0.
+pub func sign_f64(float64 x) -> int32 {
+    if (x > 0.0) {
+        return 1
+    }
+    if (x < 0.0) {
+        return -1
+    }
+    return 0
+}
+
+// ---------------------------------------------------------------------------
+// Comparison — generic, monomorphized per numeric type used
+// ---------------------------------------------------------------------------
+
+// Smaller of two values.
+pub func min[T](T a, T b) -> T {
     if (a < b) {
         return a
     }
     return b
 }
 
-// Maximum of two int32 values
-func max_i32(int32 a, int32 b) -> int32 {
+// Larger of two values.
+pub func max[T](T a, T b) -> T {
     if (a > b) {
         return a
     }
     return b
 }
 
-// Minimum of two float64 values
-func min_f64(float64 a, float64 b) -> float64 {
-    if (a < b) {
-        return a
-    }
-    return b
-}
-
-// Maximum of two float64 values
-func max_f64(float64 a, float64 b) -> float64 {
-    if (a > b) {
-        return a
-    }
-    return b
-}
-
-// Clamp a value between lo and hi
-func clamp_f64(float64 val, float64 lo, float64 hi) -> float64 {
-    if (val < lo) {
+// `v` limited to the range [lo, hi].
+pub func clamp[T](T v, T lo, T hi) -> T {
+    if (v < lo) {
         return lo
     }
-    if (val > hi) {
+    if (v > hi) {
         return hi
     }
-    return val
+    return v
+}
+
+// ---------------------------------------------------------------------------
+// Integer math
+// ---------------------------------------------------------------------------
+
+// True when x is even.
+pub func is_even(int64 x) -> bool {
+    return x % 2 == 0
+}
+
+// True when x is odd (works for negative x too).
+pub func is_odd(int64 x) -> bool {
+    return !is_even(x)
+}
+
+// base raised to a non-negative integer power. Throws on a negative exponent.
+// pow_int(2, 10) -> 1024. pow_int(x, 0) -> 1.
+pub func pow_int(int64 base, int32 exp) -> int64 {
+    if (exp < 0) {
+        throw("pow_int: negative exponent {exp}")
+    }
+    int64 result = 1
+    int32 i = 0
+    while (i < exp) {
+        result *= base
+        i += 1
+    }
+    return result
+}
+
+// Greatest common divisor (Euclid). Always non-negative; gcd(0, 0) is 0.
+pub func gcd(int64 a, int64 b) -> int64 {
+    int64 x = abs_i64(a)
+    int64 y = abs_i64(b)
+    while (y != 0) {
+        int64 r = x % y
+        x = y
+        y = r
+    }
+    return x
+}
+
+// Least common multiple. lcm(0, n) is 0. Always non-negative.
+pub func lcm(int64 a, int64 b) -> int64 {
+    if (a == 0 || b == 0) {
+        return 0
+    }
+    return abs_i64(a) / gcd(a, b) * abs_i64(b)
+}
+
+// ---------------------------------------------------------------------------
+// Float rounding and roots
+// ---------------------------------------------------------------------------
+
+// Largest whole number not greater than x, as a float64.
+pub func floor(float64 x) -> float64 {
+    float64 t = cast[float64](cast[int64](x))
+    if (t > x) {
+        return t - 1.0
+    }
+    return t
+}
+
+// Smallest whole number not less than x, as a float64.
+pub func ceil(float64 x) -> float64 {
+    float64 t = cast[float64](cast[int64](x))
+    if (t < x) {
+        return t + 1.0
+    }
+    return t
+}
+
+// x rounded to the nearest whole number, halves away from zero.
+pub func round(float64 x) -> float64 {
+    if (x < 0.0) {
+        return 0.0 - floor(0.0 - x + 0.5)
+    }
+    return floor(x + 0.5)
+}
+
+// Square root by Newton's method (pure Stenopos, no libm).
+// Accurate to well under 1e-9 relative error. Throws on negative input.
+pub func sqrt(float64 x) -> float64 {
+    if (x < 0.0) {
+        throw("sqrt: negative input")
+    }
+    if (x == 0.0) {
+        return 0.0
+    }
+    float64 guess = x
+    if (guess < 1.0) {
+        guess = 1.0
+    }
+    int32 i = 0
+    while (i < 64) {
+        guess = 0.5 * (guess + x / guess)
+        i += 1
+    }
+    return guess
 }

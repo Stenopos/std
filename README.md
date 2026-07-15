@@ -1,41 +1,76 @@
 # Stenopos Standard Library
 
-The standard library for the [Stenopos programming language](https://stenopos.github.io).
+The standard library for the [Stenopos programming language](https://stenopos.github.io),
+written in Stenopos itself.
 
 ## Modules
 
 | Module | Description | Status |
 |--------|-------------|--------|
-| `io` | File and console I/O | In development |
-| `collections` | Lists, maps, sets | In development |
-| `math` | Math functions and constants | In development |
-| `string` | String utilities | In development |
+| `string` | Text utilities: split/join, trim, case, pad, search, char classes | **Implemented + tested** |
+| `math` | abs/sign/min/max/clamp (generic), gcd/lcm, pow_int, floor/ceil/round, sqrt (Newton's method), pi/e/tau | **Implemented + tested** |
+| `collections` | List helpers: range, sum/min/max, count, concat, slice | **Implemented + tested** |
+| `io` | read_lines / write_lines / append_file over the file built-ins | **Implemented + tested** |
 | `kernel` | Linux kernel-module FFI bindings (printk, uaccess, chrdev, errno) | Designed |
 
-## Using the standard library
+Every implemented module has a sibling test program (`<mod>/test_<mod>.sten`)
+that exercises each function and prints a PASS/FAIL summary.
 
-```stenopos
-import io.file
-import math
-import collections.list
+## Running the tests
 
-str content = io.file.read("data.txt")
-float64 root = math.sqrt(2.0)
+Each test is a standalone program; run it with the Stenopos compiler:
+
+```bash
+stenopos run string/test_string.sten
+stenopos run math/test_math.sten
+stenopos run collections/test_collections.sten
+stenopos run io/test_io.sten
 ```
 
-## Built-in string methods
+All four print `PASS` on a green tree.
 
-These are available on any `str` value without an import:
+## A taste
 
 ```stenopos
-str s = "Hello, World!"
-int32 n = s.len()
-bool b = s.contains("World")
-str u = s.to_upper()
-str l = s.to_lower()
-str t = s.trim()
-str r = s.replace("World", "Stenopos")
+// string
+List[str] parts = split("a,b,c", ",")        // ["a", "b", "c"]
+str joined = join(parts, " | ")              // "a | b | c"
+str t = trim("  hi  ")                       // "hi"
+str u = to_upper("stenopos")                  // "STENOPOS"
+
+// math
+float64 r = sqrt(2.0)                        // 1.41421...
+int64 g = gcd(48, 36)                        // 12
+int32 c = clamp(v, 0, 100)                   // generic min/max/clamp
+
+// collections
+List[int32] xs = range(1, 5)                 // [1, 2, 3, 4, 5]
+int32 total = sum_i32(xs)                    // 15
+
+// io
+List[str] lines = read_lines("data.txt")
 ```
+
+## How std is loaded
+
+Stenopos compiles **whole programs from source** — there is no binary library
+format yet. Today, std modules are compiled together with your program like
+any other Stenopos source. The planned resolution (tracked on the roadmap):
+
+1. `import std.string` will resolve against an installed std tree — the
+   `STENOPOS_STD` environment variable, or a `std/` directory shipped next to
+   the compiler binary.
+2. The compiler merges the imported std sources into your program's build,
+   exactly as it merges your own modules.
+3. Later, a package manager (`stenopos add`) and a precompiled module cache
+   take over distribution; the source-tree model stays as the fallback.
+
+Design notes: functions are free functions (not methods) so they work with
+Stenopos's current module system; names carry explicit type suffixes
+(`sum_i32`, `abs_f64`) where generics can't yet express the constraint, and
+generics (`min[T]`, `clamp[T]`) where they can. No FFI — everything,
+including `sqrt`, is pure Stenopos over the language's built-ins. (`repeat`
+turned out to be reserved by the compiler, hence `repeat_str`.)
 
 ## Writing a Linux kernel module
 

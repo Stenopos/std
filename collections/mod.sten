@@ -1,72 +1,180 @@
 // Stenopos standard library — collections module
-// Common data structures
+// Helpers over the built-in List[T] and HashMap[str, V].
+//
+// The language has no lambdas yet, so map/filter/fold are deferred; these are
+// the concrete-typed helpers everyday code reaches for. Names carry a type
+// suffix (sum_i32, ...) because functions cannot be overloaded yet.
 
-module collections
+module std.collections
 
-// Dynamic list (resizable array)
-// Usage: List[int32] nums = List.new()
-//        nums.push(42)
-//        int32 x = nums.get(0)
-class List[T] {
-    // TODO: implement
-    private ptr[void] data
-    private uint64 length
-    private uint64 capacity
+// ---------------------------------------------------------------------------
+// Building lists
+// ---------------------------------------------------------------------------
 
-    func push(T item) -> void {
-        // TODO: implement
+// The integers from lo (inclusive) to hi (exclusive), in order.
+// range(2, 5) -> [2, 3, 4]; range(5, 5) -> []. Length is hi - lo.
+// (Half-open on purpose: the language's own `a..b` range is inclusive.)
+pub func range(int32 lo, int32 hi) -> List[int32] {
+    List[int32] out = list_new()
+    int32 i = lo
+    while (i < hi) {
+        out.push(i)
+        i += 1
     }
-
-    func get(uint64 index) -> T {
-        // TODO: implement
-    }
-
-    func len() -> uint64 {
-        return length
-    }
+    return out
 }
 
-// Hash map (key-value store)
-// Usage: Map[str, int32] scores = Map.new()
-//        scores.set("alice", 100)
-//        int32 s = scores.get("alice")
-class Map[K, V] {
-    // TODO: implement
-    private ptr[void] data
-
-    func set(K key, V value) -> void {
-        // TODO: implement
+// A list holding `value` repeated `n` times. n <= 0 yields [].
+pub func repeat_i32(int32 value, int32 n) -> List[int32] {
+    List[int32] out = list_new()
+    int32 i = 0
+    while (i < n) {
+        out.push(value)
+        i += 1
     }
-
-    func get(K key) -> V {
-        // TODO: implement
-    }
-
-    func contains(K key) -> bool {
-        // TODO: implement
-        return false
-    }
+    return out
 }
 
-// Hash set (unique values)
-// Usage: Set[str] seen = Set.new()
-//        seen.add("hello")
-//        bool b = seen.contains("hello")
-class Set[T] {
-    // TODO: implement
-    private ptr[void] data
-
-    func add(T item) -> void {
-        // TODO: implement
+// A new list holding all of `a` then all of `b`.
+pub func concat_i32(List[int32] a, List[int32] b) -> List[int32] {
+    List[int32] out = list_new()
+    for (x in a) {
+        out.push(x)
     }
-
-    func contains(T item) -> bool {
-        // TODO: implement
-        return false
+    for (x in b) {
+        out.push(x)
     }
+    return out
+}
 
-    func len() -> uint64 {
-        // TODO: implement
-        return 0
+// Copy of xs[lo..hi) (half-open). Bounds are clamped to the list, so
+// slice_i32(xs, 0, 999) is just a copy of xs.
+pub func slice_i32(List[int32] xs, int64 lo, int64 hi) -> List[int32] {
+    List[int32] out = list_new()
+    int64 n = xs.len()
+    if (lo < 0) {
+        lo = 0
     }
+    if (hi > n) {
+        hi = n
+    }
+    int64 i = lo
+    while (i < hi) {
+        out.push(xs.get(i))
+        i += 1
+    }
+    return out
+}
+
+// ---------------------------------------------------------------------------
+// Aggregation
+// ---------------------------------------------------------------------------
+
+// Sum of an int32 list. Empty list sums to 0.
+pub func sum_i32(List[int32] xs) -> int32 {
+    int32 total = 0
+    for (x in xs) {
+        total += x
+    }
+    return total
+}
+
+// Sum of an int64 list. Empty list sums to 0.
+pub func sum_i64(List[int64] xs) -> int64 {
+    int64 total = 0
+    for (x in xs) {
+        total += x
+    }
+    return total
+}
+
+// Sum of a float64 list. Empty list sums to 0.0.
+pub func sum_f64(List[float64] xs) -> float64 {
+    float64 total = 0.0
+    for (x in xs) {
+        total += x
+    }
+    return total
+}
+
+// Smallest value in an int32 list. Throws on an empty list.
+pub func min_of_i32(List[int32] xs) -> int32 {
+    if (xs.len() == 0) {
+        throw("min_of_i32: empty list")
+    }
+    int32 best = xs.get(0)
+    for (x in xs) {
+        if (x < best) {
+            best = x
+        }
+    }
+    return best
+}
+
+// Largest value in an int32 list. Throws on an empty list.
+pub func max_of_i32(List[int32] xs) -> int32 {
+    if (xs.len() == 0) {
+        throw("max_of_i32: empty list")
+    }
+    int32 best = xs.get(0)
+    for (x in xs) {
+        if (x > best) {
+            best = x
+        }
+    }
+    return best
+}
+
+// Smallest value in a float64 list. Throws on an empty list.
+pub func min_of_f64(List[float64] xs) -> float64 {
+    if (xs.len() == 0) {
+        throw("min_of_f64: empty list")
+    }
+    float64 best = xs.get(0)
+    for (x in xs) {
+        if (x < best) {
+            best = x
+        }
+    }
+    return best
+}
+
+// Largest value in a float64 list. Throws on an empty list.
+pub func max_of_f64(List[float64] xs) -> float64 {
+    if (xs.len() == 0) {
+        throw("max_of_f64: empty list")
+    }
+    float64 best = xs.get(0)
+    for (x in xs) {
+        if (x > best) {
+            best = x
+        }
+    }
+    return best
+}
+
+// ---------------------------------------------------------------------------
+// Counting
+// ---------------------------------------------------------------------------
+
+// How many elements of xs equal `value`.
+pub func count_i32(List[int32] xs, int32 value) -> int32 {
+    int32 hits = 0
+    for (x in xs) {
+        if (x == value) {
+            hits += 1
+        }
+    }
+    return hits
+}
+
+// How many elements of xs equal `value` (string comparison by content).
+pub func count_str(List[str] xs, str value) -> int32 {
+    int32 hits = 0
+    for (x in xs) {
+        if (x == value) {
+            hits += 1
+        }
+    }
+    return hits
 }
