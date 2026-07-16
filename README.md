@@ -11,6 +11,8 @@ written in Stenopos itself.
 | `math` | abs/sign/min/max/clamp (generic), gcd/lcm, pow_int, floor/ceil/round, sqrt (Newton's method), pi/e/tau | **Implemented + tested** |
 | `collections` | List helpers: range, sum/min/max, count, concat, slice | **Implemented + tested** |
 | `io` | read_lines / write_lines / append_file over the file built-ins | **Implemented + tested** |
+| `testing` | A tiny unit-test framework: expect / expect_eq_* / report | **Implemented + tested** |
+| `os` | Process + argv helpers: run / run_ok / argc / arg_at / args / has_flag | **Implemented + tested** |
 | `kernel` | Linux kernel-module FFI bindings (printk, uaccess, chrdev, errno) | Designed |
 
 Every implemented module has a sibling test program (`<mod>/test_<mod>.sten`)
@@ -18,16 +20,21 @@ that exercises each function and prints a PASS/FAIL summary.
 
 ## Running the tests
 
-Each test is a standalone program; run it with the Stenopos compiler:
+Each test is a standalone program; run it with the Stenopos compiler. The
+tests import each other across modules (e.g. `os` uses `testing`), so point
+`STENOPOS_STD` at this checkout so `import std.*` resolves:
 
 ```bash
+export STENOPOS_STD=$(pwd)
 stenopos run string/test_string.sten
 stenopos run math/test_math.sten
 stenopos run collections/test_collections.sten
 stenopos run io/test_io.sten
+stenopos run testing/test_testing.sten
+stenopos run os/test_os.sten
 ```
 
-All four print `PASS` on a green tree.
+All of them print `PASS` on a green tree.
 
 ## A taste
 

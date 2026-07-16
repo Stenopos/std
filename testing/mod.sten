@@ -1,0 +1,78 @@
+// Stenopos standard library — testing module
+// A tiny unit-test framework: each `expect_*` prints one ok/FAIL line and
+// returns 1 on failure (0 on pass); a test sums those into a failure count,
+// and `report` turns the total into a summary and a process exit code.
+//
+// Results thread through return values because Stenopos has no module-level
+// mutable globals — the same shape the compiler's own self-host tests use.
+//
+//   import std.testing.{expect, expect_eq_int, expect_eq_str, report}
+//
+//   func main() -> int32 {
+//       int32 fails = 0
+//       fails += expect(1 + 1 == 2, "addition")
+//       fails += expect_eq_int(2 * 3, 6, "multiplication")
+//       return report(fails)
+//   }
+
+module std.testing
+
+// Core check: print a pass/fail line and return 1 when the condition is false.
+pub func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   {name}")
+        return 0
+    }
+    println("  FAIL {name}")
+    return 1
+}
+
+// Assert two int32 values are equal; on failure the line shows both.
+pub func expect_eq_int(int32 got, int32 want, str name) -> int32 {
+    if (got == want) {
+        return expect(true, name)
+    }
+    println("  FAIL {name}: got {got}, want {want}")
+    return 1
+}
+
+// Assert two int64 values are equal.
+pub func expect_eq_int64(int64 got, int64 want, str name) -> int32 {
+    if (got == want) {
+        return expect(true, name)
+    }
+    println("  FAIL {name}: got {got}, want {want}")
+    return 1
+}
+
+// Assert two strings are equal (by value).
+pub func expect_eq_str(str got, str want, str name) -> int32 {
+    if (got == want) {
+        return expect(true, name)
+    }
+    println("  FAIL {name}: got '{got}', want '{want}'")
+    return 1
+}
+
+// Assert a condition is true (an alias for `expect`, reads well in tests).
+pub func expect_true(bool cond, str name) -> int32 {
+    return expect(cond, name)
+}
+
+// Assert a condition is false.
+pub func expect_false(bool cond, str name) -> int32 {
+    return expect(!cond, name)
+}
+
+// Print the final summary and return the failure count — 0 on success, so a
+// test's `main` can `return report(fails)` and the process exit code is the
+// number of failures (non-zero fails CI).
+@ignore_discard
+pub func report(int32 failures) -> int32 {
+    if (failures == 0) {
+        println("PASS: all checks passed")
+    } else {
+        println("FAIL: {failures} check(s) failed")
+    }
+    return failures
+}

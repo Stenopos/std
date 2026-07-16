@@ -1,0 +1,34 @@
+// Tests for std.os — run with:
+//   stenopos-cli run std/os/test_os.sten
+// Exercises the shell-command and argv helpers. (When run via `stenopos run`
+// there are no extra program arguments, so args() is empty and has_flag is
+// false — that IS the property we check.)
+
+module std.os.tests
+
+import std.testing.{expect, expect_eq_int, report}
+import std.os.{run, run_ok, argc, arg_at, args, has_flag}
+
+func main() -> int32 {
+    int32 fails = 0
+
+    // run / run_ok reflect a command's exit code.
+    fails += expect_eq_int(run("true"), 0, "run true -> 0")
+    fails += expect(run("false") != 0, "run false -> non-zero")
+    fails += expect(run_ok("true"), "run_ok true")
+    fails += expect(!run_ok("false"), "run_ok false")
+
+    // argc counts at least the program name.
+    fails += expect(argc() >= 1, "argc includes argv[0]")
+
+    // Out-of-range args return "" rather than aborting.
+    fails += expect(arg_at(0 - 1) == "", "arg_at(-1) is empty")
+    fails += expect(arg_at(100000) == "", "arg_at(huge) is empty")
+
+    // With no extra arguments, args() is empty and no flag is present.
+    List[str] rest = args()
+    fails += expect_eq_int(cast[int32](rest.len()), 0, "args() empty under stenopos run")
+    fails += expect(!has_flag("--nope"), "has_flag absent -> false")
+
+    return report(fails)
+}
