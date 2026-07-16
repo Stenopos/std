@@ -13,6 +13,8 @@ written in Stenopos itself.
 | `io` | read_lines / write_lines / append_file over the file built-ins | **Implemented + tested** |
 | `testing` | A tiny unit-test framework: expect / expect_eq_* / report | **Implemented + tested** |
 | `os` | Process + argv helpers: run / run_ok / argc / arg_at / args / has_flag | **Implemented + tested** |
+| `convert` | Primitive ↔ string: int/int64/float/bool_to_str, parse_int, is_int | **Implemented + tested** |
+| `assert` | Runtime assertions built on `fail`: assert / assert_eq_* / unreachable | **Implemented + tested** |
 | `kernel` | Linux kernel-module FFI bindings (printk, uaccess, chrdev, errno) | Designed |
 
 Every implemented module has a sibling test program (`<mod>/test_<mod>.sten`)
@@ -32,6 +34,8 @@ stenopos run collections/test_collections.sten
 stenopos run io/test_io.sten
 stenopos run testing/test_testing.sten
 stenopos run os/test_os.sten
+stenopos run convert/test_convert.sten
+stenopos run assert/test_assert.sten
 ```
 
 All of them print `PASS` on a green tree.

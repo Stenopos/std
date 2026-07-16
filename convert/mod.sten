@@ -1,0 +1,90 @@
+// Stenopos standard library — convert module
+// Conversions between the primitive types and strings: value → string via
+// interpolation, and string → int via a hand-written decimal parser.
+//
+//   import std.convert.{int_to_str, parse_int, bool_to_str}
+//
+// The `*_to_str` helpers wrap Stenopos's string interpolation so a conversion
+// reads as a named call. `parse_int` accepts an optional leading `-` and
+// decimal digits; `is_int` reports whether a whole string is a valid integer.
+
+module std.convert
+
+// The decimal text of an int32.
+pub func int_to_str(int32 n) -> str {
+    return "{n}"
+}
+
+// The decimal text of an int64.
+pub func int64_to_str(int64 n) -> str {
+    return "{n}"
+}
+
+// A float64 formatted with %g (the same format println uses).
+pub func float_to_str(float64 x) -> str {
+    return "{x}"
+}
+
+// The word "true" or "false".
+pub func bool_to_str(bool b) -> str {
+    if (b) {
+        return "true"
+    }
+    return "false"
+}
+
+// True when `s` is a non-empty string of decimal digits, with an optional
+// leading `-` — i.e. `parse_int` would consume all of it.
+pub func is_int(str s) -> bool {
+    int64 n = s.len()
+    if (n == 0) {
+        return false
+    }
+    int64 i = 0
+    if (s.byte_at(0) == '-') {
+        if (n == 1) {
+            return false
+        }
+        i = 1
+    }
+    while (i < n) {
+        int32 c = s.byte_at(i)
+        if (c < '0' || c > '9') {
+            return false
+        }
+        i = i + 1
+    }
+    return true
+}
+
+// Parse a decimal string to an int32. Accepts an optional leading `-`; stops
+// at the first non-digit (so " 42 " → 0, "42abc" → 42). Returns 0 for a
+// string with no leading digits. Use `is_int` first if you need to be strict.
+pub func parse_int(str s) -> int32 {
+    int64 n = s.len()
+    int64 i = 0
+    bool neg = false
+    if (n > 0 && s.byte_at(0) == '-') {
+        neg = true
+        i = 1
+    }
+    int32 value = 0
+    while (i < n) {
+        int32 c = s.byte_at(i)
+        if (c < '0' || c > '9') {
+            i = n
+        } else {
+            value = value * 10 + (c - '0')
+            i = i + 1
+        }
+    }
+    if (neg) {
+        return 0 - value
+    }
+    return value
+}
+
+// An alias reading well as `str_to_int(s)`.
+pub func str_to_int(str s) -> int32 {
+    return parse_int(s)
+}

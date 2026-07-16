@@ -1,0 +1,44 @@
+// Stenopos standard library — assert module
+// Runtime assertions: check an invariant and abort with a diagnostic (via the
+// `fail` built-in) when it does not hold. Use these for programmer-error
+// conditions that should never happen in a correct program — not for expected
+// failures (return a value or throw for those).
+//
+//   import std.assert.{assert, assert_eq_int, unreachable}
+//
+//   assert(index >= 0, "index must be non-negative")
+
+module std.assert
+
+// Abort with `message` unless `cond` is true.
+pub func assert(bool cond, str message) -> void {
+    if (!cond) {
+        fail("assertion failed: " + message)
+    }
+}
+
+// Abort unless `got == want`; the message shows both values.
+pub func assert_eq_int(int32 got, int32 want, str message) -> void {
+    if (got != want) {
+        fail("assertion failed: {message} (got {got}, want {want})")
+    }
+}
+
+// Abort unless two strings are equal.
+pub func assert_eq_str(str got, str want, str message) -> void {
+    if (got != want) {
+        fail("assertion failed: {message} (got '{got}', want '{want}')")
+    }
+}
+
+// Abort unless `cond` is FALSE.
+pub func assert_false(bool cond, str message) -> void {
+    if (cond) {
+        fail("assertion failed: expected false: " + message)
+    }
+}
+
+// Mark a code path that should never execute; aborts with `message` if it is.
+pub func unreachable(str message) -> void {
+    fail("reached unreachable code: " + message)
+}

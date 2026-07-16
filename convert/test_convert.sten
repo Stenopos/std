@@ -1,0 +1,42 @@
+// Tests for std.convert — run with:
+//   STENOPOS_STD=<checkout> stenopos run std/convert/test_convert.sten
+
+module std.convert.tests
+
+import std.testing.{expect, expect_eq_int, expect_eq_str, report}
+import std.convert.{int_to_str, int64_to_str, float_to_str, bool_to_str}
+import std.convert.{is_int, parse_int, str_to_int}
+
+func main() -> int32 {
+    int32 fails = 0
+
+    // value -> string
+    fails += expect_eq_str(int_to_str(42), "42", "int_to_str positive")
+    fails += expect_eq_str(int_to_str(0 - 7), "-7", "int_to_str negative")
+    fails += expect_eq_str(int_to_str(0), "0", "int_to_str zero")
+    fails += expect_eq_str(int64_to_str(cast[int64](1000000)), "1000000", "int64_to_str")
+    fails += expect_eq_str(float_to_str(3.5), "3.5", "float_to_str")
+    fails += expect_eq_str(bool_to_str(true), "true", "bool_to_str true")
+    fails += expect_eq_str(bool_to_str(false), "false", "bool_to_str false")
+
+    // is_int
+    fails += expect(is_int("42"), "is_int 42")
+    fails += expect(is_int("-7"), "is_int -7")
+    fails += expect(!is_int(""), "is_int empty -> false")
+    fails += expect(!is_int("-"), "is_int lone minus -> false")
+    fails += expect(!is_int("12x"), "is_int trailing junk -> false")
+    fails += expect(!is_int("3.5"), "is_int float -> false")
+
+    // parse_int
+    fails += expect_eq_int(parse_int("42"), 42, "parse_int 42")
+    fails += expect_eq_int(parse_int("-7"), 0 - 7, "parse_int -7")
+    fails += expect_eq_int(parse_int("0"), 0, "parse_int 0")
+    fails += expect_eq_int(parse_int("100"), 100, "parse_int 100")
+    fails += expect_eq_int(parse_int("42abc"), 42, "parse_int stops at non-digit")
+    fails += expect_eq_int(str_to_int("999"), 999, "str_to_int alias")
+
+    // round trip
+    fails += expect_eq_int(parse_int(int_to_str(12345)), 12345, "int_to_str -> parse_int round trip")
+
+    return report(fails)
+}

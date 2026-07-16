@@ -1,0 +1,26 @@
+// Tests for std.assert — run with:
+//   STENOPOS_STD=<checkout> stenopos run std/assert/test_assert.sten
+// A failing assertion aborts the whole process, so this test only exercises
+// the PASSING paths (reaching `report` at the end IS the assertion that none
+// of them fired). The abort behavior is verified by the compiler's own
+// compile-fail / runtime tests elsewhere.
+
+module std.assert.tests
+
+import std.testing.{expect, report}
+import std.assert.{assert, assert_eq_int, assert_eq_str, assert_false}
+
+func main() -> int32 {
+    int32 fails = 0
+
+    // None of these should abort — if any did, the process would exit before
+    // the checks below and `report` would never print PASS.
+    assert(1 + 1 == 2, "arithmetic holds")
+    assert_eq_int(6, 6, "eq_int passes")
+    assert_eq_str("ok", "ok", "eq_str passes")
+    assert_false(1 > 2, "assert_false passes")
+
+    fails += expect(true, "all passing assertions returned normally")
+
+    return report(fails)
+}
