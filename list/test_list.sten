@@ -1,0 +1,127 @@
+// Tests for std.list — run with (from the std checkout):
+//   export STENOPOS_STD=$(pwd)
+//   stenopos run list/test_list.sten
+// Prints one ok/FAIL line per check and a PASS/FAIL summary.
+
+module std.list.tests
+
+import std.list.{is_empty, first, last, contains, index_of, count}
+import std.list.{copy, concat, fill, reverse, take, drop}
+
+func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   {name}")
+        return 0
+    }
+    println("  FAIL {name}")
+    return 1
+}
+
+func test_inspecting() -> int32 {
+    int32 fails = 0
+    List[int32] xs = list_new()
+    fails += expect(is_empty(xs), "is_empty true")
+    xs.push(10)
+    xs.push(20)
+    xs.push(30)
+    fails += expect(!is_empty(xs), "is_empty false")
+    fails += expect(first(xs) == 10, "first")
+    fails += expect(last(xs) == 30, "last")
+
+    int32 caught = 0
+    List[int32] none = list_new()
+    try {
+        int32 bad = first(none)
+        println("  unreachable {bad}")
+    } catch (Error err) {
+        caught = 1
+    }
+    fails += expect(caught == 1, "first empty throws")
+    return fails
+}
+
+func test_searching() -> int32 {
+    int32 fails = 0
+    List[int32] xs = list_new()
+    xs.push(3)
+    xs.push(7)
+    xs.push(3)
+    xs.push(9)
+    fails += expect(contains(xs, 7), "contains hit")
+    fails += expect(!contains(xs, 8), "contains miss")
+    fails += expect(index_of(xs, 9) == 3, "index_of hit")
+    fails += expect(index_of(xs, 8) == 0 - 1, "index_of miss is -1")
+    fails += expect(count(xs, 3) == 2, "count")
+
+    List[str] words = list_new()
+    words.push("stenopos")
+    words.push("hawk")
+    words.push("stenopos")
+    str stenopos = "stenopos"
+    str owl = "owl"
+    fails += expect(contains(words, stenopos), "contains str hit")
+    fails += expect(!contains(words, owl), "contains str miss")
+    fails += expect(index_of(words, stenopos) == 0, "index_of str")
+    fails += expect(count(words, stenopos) == 2, "count str")
+    return fails
+}
+
+func test_building() -> int32 {
+    int32 fails = 0
+    List[int32] xs = list_new()
+    xs.push(1)
+    xs.push(2)
+    xs.push(3)
+
+    List[int32] c = copy(xs)
+    fails += expect(c.len() == 3 && c.get(0) == 1, "copy")
+    c.push(99)
+    fails += expect(xs.len() == 3, "copy leaves source intact")
+
+    List[int32] ys = list_new()
+    ys.push(4)
+    ys.push(5)
+    List[int32] ab = concat(xs, ys)
+    fails += expect(ab.len() == 5, "concat length")
+    fails += expect(ab.get(2) == 3 && ab.get(3) == 4, "concat seam")
+
+    List[int32] rr = fill(7, 3)
+    fails += expect(rr.len() == 3 && rr.get(0) == 7 && rr.get(2) == 7, "fill")
+    fails += expect(fill(1, 0).len() == 0, "fill zero")
+
+    List[int32] rev = reverse(xs)
+    fails += expect(rev.len() == 3 && rev.get(0) == 3 && rev.get(2) == 1, "reverse")
+
+    List[int32] t = take(xs, 2)
+    fails += expect(t.len() == 2 && t.get(0) == 1 && t.get(1) == 2, "take")
+    List[int32] tbig = take(xs, 99)
+    fails += expect(tbig.len() == 3, "take clamps")
+    List[int32] tzero = take(xs, 0)
+    fails += expect(tzero.len() == 0, "take zero")
+
+    List[int32] d = drop(xs, 1)
+    fails += expect(d.len() == 2 && d.get(0) == 2, "drop")
+    List[int32] dbig = drop(xs, 99)
+    fails += expect(dbig.len() == 0, "drop past end")
+
+    // Reverse works for str elements too (monomorphized copy).
+    List[str] names = list_new()
+    names.push("a")
+    names.push("b")
+    List[str] rn = reverse(names)
+    str head = rn.get(0)
+    fails += expect(head == "b", "reverse str")
+    return fails
+}
+
+func main() -> void {
+    int32 fails = 0
+    println("std.list tests:")
+    fails += test_inspecting()
+    fails += test_searching()
+    fails += test_building()
+    if (fails > 0) {
+        fail("FAIL: {fails} check(s) failed")
+    }
+    println("PASS: all std.list checks passed")
+}

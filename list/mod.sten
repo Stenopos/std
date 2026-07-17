@@ -1,0 +1,155 @@
+// Stenopos standard library — list module
+//
+// Generic helpers over the built-in `List[T]`. Unlike `std.collections` (whose
+// aggregation helpers carry a type suffix because summing needs a known numeric
+// type), everything here is element-type-agnostic: the type parameter `T` is
+// inferred from the argument list and the compiler monomorphizes a copy per
+// concrete element type. They work for `List[int32]`, `List[str]`, and any
+// other supported element type.
+//
+// Equality-based helpers (contains / index_of / count) use `==`, which the
+// compiler lowers appropriately per concrete type (integer compare, string
+// content compare, ...).
+
+module std.list
+
+// ---------------------------------------------------------------------------
+// Inspecting
+// ---------------------------------------------------------------------------
+
+// True when the list has no elements.
+pub func is_empty[T](List[T] xs) -> bool {
+    return xs.len() == 0
+}
+
+// The first element. Throws on an empty list.
+pub func first[T](List[T] xs) -> T {
+    if (xs.len() == 0) {
+        throw("list.first: empty list")
+    }
+    return xs.get(0)
+}
+
+// The last element. Throws on an empty list.
+pub func last[T](List[T] xs) -> T {
+    if (xs.len() == 0) {
+        throw("list.last: empty list")
+    }
+    return xs.get(xs.len() - 1)
+}
+
+// ---------------------------------------------------------------------------
+// Searching (by content equality)
+// ---------------------------------------------------------------------------
+
+// True when some element equals `target`.
+pub func contains[T](List[T] xs, T target) -> bool {
+    for (x in xs) {
+        if (x == target) {
+            return true
+        }
+    }
+    return false
+}
+
+// Index of the first element equal to `target`, or -1 if none.
+pub func index_of[T](List[T] xs, T target) -> int32 {
+    int32 i = 0
+    for (x in xs) {
+        if (x == target) {
+            return i
+        }
+        i += 1
+    }
+    return 0 - 1
+}
+
+// How many elements equal `target`.
+pub func count[T](List[T] xs, T target) -> int32 {
+    int32 hits = 0
+    for (x in xs) {
+        if (x == target) {
+            hits += 1
+        }
+    }
+    return hits
+}
+
+// ---------------------------------------------------------------------------
+// Building new lists (originals are never modified)
+// ---------------------------------------------------------------------------
+
+// A shallow copy of `xs`.
+pub func copy[T](List[T] xs) -> List[T] {
+    List[T] out = list_new()
+    for (x in xs) {
+        out.push(x)
+    }
+    return out
+}
+
+// All of `a` followed by all of `b`, in a new list.
+pub func concat[T](List[T] a, List[T] b) -> List[T] {
+    List[T] out = list_new()
+    for (x in a) {
+        out.push(x)
+    }
+    for (x in b) {
+        out.push(x)
+    }
+    return out
+}
+
+// `value` repeated `n` times. n <= 0 yields an empty list.
+// (Named `fill` rather than `repeat` because `repeat` is a reserved word.)
+pub func fill[T](T value, int32 n) -> List[T] {
+    List[T] out = list_new()
+    int32 i = 0
+    while (i < n) {
+        out.push(value)
+        i += 1
+    }
+    return out
+}
+
+// `xs` with its elements in reverse order, in a new list.
+pub func reverse[T](List[T] xs) -> List[T] {
+    List[T] out = list_new()
+    int64 i = xs.len()
+    while (i > 0) {
+        i -= 1
+        out.push(xs.get(i))
+    }
+    return out
+}
+
+// The first `n` elements (fewer if the list is shorter). n <= 0 yields [].
+pub func take[T](List[T] xs, int64 n) -> List[T] {
+    List[T] out = list_new()
+    int64 limit = n
+    if (limit > xs.len()) {
+        limit = xs.len()
+    }
+    int64 i = 0
+    while (i < limit) {
+        out.push(xs.get(i))
+        i += 1
+    }
+    return out
+}
+
+// All elements after the first `n` (empty if n covers the whole list).
+pub func drop[T](List[T] xs, int64 n) -> List[T] {
+    List[T] out = list_new()
+    int64 start = n
+    if (start < 0) {
+        start = 0
+    }
+    int64 i = start
+    int64 total = xs.len()
+    while (i < total) {
+        out.push(xs.get(i))
+        i += 1
+    }
+    return out
+}

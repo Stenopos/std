@@ -9,7 +9,8 @@ written in Stenopos itself.
 |--------|-------------|--------|
 | `string` | Text utilities: split/join, trim, case, pad, search, char classes | **Implemented + tested** |
 | `math` | abs/sign/min/max/clamp (generic), gcd/lcm, pow_int, floor/ceil/round, sqrt (Newton's method), pi/e/tau | **Implemented + tested** |
-| `collections` | List helpers: range, sum/min/max, count, concat, slice | **Implemented + tested** |
+| `list` | Generic `List[T]` helpers: first/last, contains/index_of/count, copy/concat/fill/reverse/take/drop | **Implemented + tested** |
+| `collections` | Typed List helpers: range, sum/min/max, count, concat, slice | **Implemented + tested** |
 | `io` | read_lines / write_lines / append_file over the file built-ins | **Implemented + tested** |
 | `testing` | A tiny unit-test framework: expect / expect_eq_* / report | **Implemented + tested** |
 | `os` | Process + argv helpers: run / run_ok / argc / arg_at / args / has_flag | **Implemented + tested** |
@@ -30,6 +31,7 @@ tests import each other across modules (e.g. `os` uses `testing`), so point
 export STENOPOS_STD=$(pwd)
 stenopos run string/test_string.sten
 stenopos run math/test_math.sten
+stenopos run list/test_list.sten
 stenopos run collections/test_collections.sten
 stenopos run io/test_io.sten
 stenopos run testing/test_testing.sten
@@ -53,6 +55,12 @@ str u = to_upper("stenopos")                  // "STENOPOS"
 float64 r = sqrt(2.0)                        // 1.41421...
 int64 g = gcd(48, 36)                        // 12
 int32 c = clamp(v, 0, 100)                   // generic min/max/clamp
+
+// list (generic over the element type)
+List[str] names = list_new()
+names.push("stenopos")
+bool has = contains(names, "stenopos")        // true, works for any List[T]
+List[str] rev = reverse(names)               // new reversed list
 
 // collections
 List[int32] xs = range(1, 5)                 // [1, 2, 3, 4, 5]
