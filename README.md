@@ -12,6 +12,7 @@ written in Stenopos itself.
 | `list` | Generic `List[T]` helpers: first/last, contains/index_of/count, copy/concat/fill/reverse/take/drop | **Implemented + tested** |
 | `collections` | Typed List helpers: range, sum/min/max, count, concat, slice | **Implemented + tested** |
 | `io` | read_lines / write_lines / append_file over the file built-ins | **Implemented + tested** |
+| `logging` | Leveled logging (TRACE..FATAL): format_record/format_tagged, level_from_name, free trace/debug/info/warn/error + fatal (stderr+abort), a console `Logger` and a file `FileLogger` (build log) with threshold filtering and component tags | **Implemented + tested** |
 | `testing` | A tiny unit-test framework: expect / expect_eq_* / report | **Implemented + tested** |
 | `os` | Process + argv helpers: run / run_ok / argc / arg_at / args / has_flag | **Implemented + tested** |
 | `convert` | Primitive ↔ string: int/int64/float/bool_to_str, parse_int, is_int | **Implemented + tested** |

@@ -1,0 +1,86 @@
+// Tests for std.logging — run with:
+//   STENOPOS_STD=. stenopos-cli run logging/test_logging.sten
+// Exercises the levels, name/parse round-trips, tagged formatting, the threshold
+// predicate, a filtering console Logger, and a filtering FileLogger (build log).
+// fatal() aborts the process, so it is exercised separately, not here.
+
+module std.logging.tests
+
+import std.testing.{expect, expect_eq_int, expect_eq_str, report}
+import std.logging.{Logger, FileLogger, level_name, level_from_name, level_trace, level_debug, level_info, level_warn, level_error, level_fatal, format_record, format_tagged, enabled, append_record}
+
+@cap(File)
+func main() -> int32 {
+    int32 fails = 0
+
+    // Level ordering.
+    fails += expect_eq_int(level_trace(), 0, "trace is 0")
+    fails += expect_eq_int(level_info(), 2, "info is 2")
+    fails += expect_eq_int(level_fatal(), 5, "fatal is 5")
+    fails += expect(level_debug() < level_info(), "debug < info")
+    fails += expect(level_error() < level_fatal(), "error < fatal")
+
+    // level_name over the full range + clamping.
+    fails += expect_eq_str(level_name(0), "TRACE", "name 0")
+    fails += expect_eq_str(level_name(1), "DEBUG", "name 1")
+    fails += expect_eq_str(level_name(2), "INFO", "name 2")
+    fails += expect_eq_str(level_name(3), "WARN", "name 3")
+    fails += expect_eq_str(level_name(4), "ERROR", "name 4")
+    fails += expect_eq_str(level_name(5), "FATAL", "name 5")
+    fails += expect_eq_str(level_name(0 - 3), "TRACE", "name clamps low")
+    fails += expect_eq_str(level_name(99), "FATAL", "name clamps high")
+
+    // level_from_name: case-insensitive, aliases, and the safe default.
+    fails += expect_eq_int(level_from_name("TRACE"), 0, "parse TRACE")
+    fails += expect_eq_int(level_from_name("Info"), 2, "parse Info")
+    fails += expect_eq_int(level_from_name("warning"), 3, "parse warning alias")
+    fails += expect_eq_int(level_from_name("err"), 4, "parse err alias")
+    fails += expect_eq_int(level_from_name("critical"), 5, "parse critical alias")
+    fails += expect_eq_int(level_from_name("nonsense"), 2, "parse unknown -> INFO")
+
+    // Formatting, with and without a component tag.
+    fails += expect_eq_str(format_record(2, "hi"), "[INFO] hi", "format no tag")
+    fails += expect_eq_str(format_tagged(3, "db", "slow"), "[WARN] [db] slow", "format with tag")
+    fails += expect_eq_str(format_tagged(2, "", "x"), "[INFO] x", "empty tag = no tag")
+
+    // Threshold predicate.
+    fails += expect(enabled(2, 2), "info passes info threshold")
+    fails += expect(enabled(2, 4), "error passes info threshold")
+    fails += expect(!enabled(3, 2), "info dropped at warn threshold")
+
+    // Console Logger: filtering is covered by the FileLogger below (its output is
+    // observable); here we just confirm construction + a below-threshold call is
+    // a no-op that does not abort.
+    Logger con = Logger { threshold: 3, tag: "app" }
+    con.info("dropped, below WARN threshold")
+    con.warn("kept (goes to stdout)")
+
+    // FileLogger: threshold=INFO, tag "build". TRACE/DEBUG drop; INFO..ERROR are
+    // appended with the tag and read back.
+    str path = "/tmp/stenopos_logging_test.log"
+    discard write_file(path, "")
+    FileLogger log = FileLogger { threshold: 2, tag: "build", path: path }
+    discard log.trace("dropped")
+    discard log.debug("dropped")
+    discard log.info("started")
+    discard log.warn("cache miss")
+    discard log.error("link failed")
+
+    str want = "[INFO] [build] started\n[WARN] [build] cache miss\n[ERROR] [build] link failed\n"
+    fails += expect_eq_str(read_file(path), want, "file logger filters + tags + appends")
+
+    // A returned bool reflects whether a record was written.
+    discard write_file(path, "")
+    FileLogger l2 = FileLogger { threshold: 3, tag: "", path: path }
+    fails += expect(!l2.info("below threshold"), "log() returns false when dropped")
+    fails += expect(l2.error("written"), "log() returns true when written")
+    fails += expect_eq_str(read_file(path), "[ERROR] written\n", "only the kept record landed")
+
+    // append_record grows a file with a formatted line.
+    discard write_file(path, "")
+    discard append_record(path, 3, "one")
+    discard append_record(path, 3, "two")
+    fails += expect_eq_str(read_file(path), "[WARN] one\n[WARN] two\n", "append_record grows the file")
+
+    return report(fails)
+}

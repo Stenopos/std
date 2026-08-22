@@ -1,0 +1,222 @@
+// Stenopos standard library — logging module
+// Leveled logging: six levels, formatting with optional component tags, a
+// threshold filter, and console / file / abort sinks.
+//
+//   import std.logging.{Logger, FileLogger, info, warn, error, fatal}
+//
+// Three ways to use it:
+//   - Free functions trace/debug/info/warn/error(msg) print "[LEVEL] msg" to
+//     stdout; fatal(msg) prints to stderr and aborts (exit 1).
+//   - A console `Logger { threshold, tag }` drops records below `threshold`,
+//     prints to stdout, and prefixes each with an optional component tag. It
+//     needs no capability.
+//   - A `FileLogger { threshold, tag, path }` appends filtered records to a file
+//     — a persistent build log kept separate from a program's output. Because it
+//     writes files it carries @cap(File).
+//
+// Levels are plain int32, 0 (TRACE) .. 5 (FATAL); use the level_*() helpers,
+// level_from_name() for config strings, or the numbers directly. There is no
+// stderr primitive yet, so ordinary console output goes to stdout; only fatal()
+// (via the fail built-in) reaches stderr.
+
+module std.logging
+
+// --- Levels (higher is more severe) ---
+pub func level_trace() -> int32 {
+    return 0
+}
+pub func level_debug() -> int32 {
+    return 1
+}
+pub func level_info() -> int32 {
+    return 2
+}
+pub func level_warn() -> int32 {
+    return 3
+}
+pub func level_error() -> int32 {
+    return 4
+}
+pub func level_fatal() -> int32 {
+    return 5
+}
+
+// The uppercase tag for a level. Values outside 0..5 clamp to the nearest end.
+pub func level_name(int32 level) -> str {
+    if (level <= 0) {
+        return "TRACE"
+    }
+    if (level == 1) {
+        return "DEBUG"
+    }
+    if (level == 2) {
+        return "INFO"
+    }
+    if (level == 3) {
+        return "WARN"
+    }
+    if (level == 4) {
+        return "ERROR"
+    }
+    return "FATAL"
+}
+
+// Parse a level name (any case) to its int32 level. Unknown names return
+// level_info(), a safe default for config strings.
+pub func level_from_name(str name) -> int32 {
+    str n = name.to_lower()
+    if (n == "trace") {
+        return 0
+    }
+    if (n == "debug") {
+        return 1
+    }
+    if (n == "info") {
+        return 2
+    }
+    if (n == "warn" || n == "warning") {
+        return 3
+    }
+    if (n == "error" || n == "err") {
+        return 4
+    }
+    if (n == "fatal" || n == "critical") {
+        return 5
+    }
+    return 2
+}
+
+// Format a record with an optional component tag:
+//   tag empty  -> "[INFO] message"
+//   tag "db"   -> "[INFO] [db] message"
+// Pure — no I/O — so it is easy to test and reuse for a custom sink.
+pub func format_tagged(int32 level, str tag, str msg) -> str {
+    if (tag.len() > 0) {
+        return "[" + level_name(level) + "] [" + tag + "] " + msg
+    }
+    return "[" + level_name(level) + "] " + msg
+}
+
+// Format a record as "[LEVEL] message" (no tag).
+pub func format_record(int32 level, str msg) -> str {
+    return format_tagged(level, "", msg)
+}
+
+// True if a record at `level` passes a minimum `threshold`.
+pub func enabled(int32 threshold, int32 level) -> bool {
+    return level >= threshold
+}
+
+// --- Free-function console API (always emits; no threshold) ---
+pub func trace(str msg) -> void {
+    println(format_record(0, msg))
+}
+pub func debug(str msg) -> void {
+    println(format_record(1, msg))
+}
+pub func info(str msg) -> void {
+    println(format_record(2, msg))
+}
+pub func warn(str msg) -> void {
+    println(format_record(3, msg))
+}
+pub func error(str msg) -> void {
+    println(format_record(4, msg))
+}
+
+// Log at FATAL to stderr and abort the process (exit 1). Never returns.
+pub func fatal(str msg) -> void {
+    fail(format_record(5, msg))
+}
+
+// Append a formatted record (plus a newline) to `path`, creating or growing the
+// file. Returns true on success. The standalone persistent-log / build-log sink.
+@cap(File)
+pub func append_record(str path, int32 level, str msg) -> bool {
+    str combined = read_file(path) + format_record(level, msg) + "\n"
+    return write_file(path, combined)
+}
+
+// A console logger: filters by `threshold` and prints to stdout, prefixing each
+// record with an optional component `tag`. Needs no capability.
+pub struct Logger {
+    pub int32 threshold
+    pub str tag
+
+    // Emit a record to stdout if it meets the threshold.
+    pub func log(int32 level, str msg) -> void {
+        if (level < this.threshold) {
+            return
+        }
+        println(format_tagged(level, this.tag, msg))
+    }
+
+    pub func trace(str msg) -> void {
+        this.log(0, msg)
+    }
+    pub func debug(str msg) -> void {
+        this.log(1, msg)
+    }
+    pub func info(str msg) -> void {
+        this.log(2, msg)
+    }
+    pub func warn(str msg) -> void {
+        this.log(3, msg)
+    }
+    pub func error(str msg) -> void {
+        this.log(4, msg)
+    }
+
+    // FATAL always fires regardless of threshold: emit to stderr and abort.
+    pub func fatal(str msg) -> void {
+        fail(format_tagged(5, this.tag, msg))
+    }
+}
+
+// A file logger: filters by `threshold` and APPENDS records to `path`, prefixing
+// each with an optional component `tag`. Writes files, so it carries @cap(File).
+pub struct FileLogger {
+    pub int32 threshold
+    pub str tag
+    pub str path
+
+    // Emit a record to the file if it meets the threshold. Returns true when a
+    // record was written (false when dropped below threshold or the write fails).
+    @cap(File)
+    pub func log(int32 level, str msg) -> bool {
+        if (level < this.threshold) {
+            return false
+        }
+        str line = format_tagged(level, this.tag, msg)
+        str combined = read_file(this.path) + line + "\n"
+        return write_file(this.path, combined)
+    }
+
+    @cap(File)
+    pub func trace(str msg) -> bool {
+        return this.log(0, msg)
+    }
+    @cap(File)
+    pub func debug(str msg) -> bool {
+        return this.log(1, msg)
+    }
+    @cap(File)
+    pub func info(str msg) -> bool {
+        return this.log(2, msg)
+    }
+    @cap(File)
+    pub func warn(str msg) -> bool {
+        return this.log(3, msg)
+    }
+    @cap(File)
+    pub func error(str msg) -> bool {
+        return this.log(4, msg)
+    }
+
+    // FATAL always fires: append to the file, then abort via stderr.
+    @cap(File)
+    pub func fatal(str msg) -> void {
+        discard this.log(5, msg)
+        fail(format_tagged(5, this.tag, msg))
+    }
+}
