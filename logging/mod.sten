@@ -6,18 +6,18 @@
 //
 // Three ways to use it:
 //   - Free functions trace/debug/info/warn/error(msg) print "[LEVEL] msg" to
-//     stdout; fatal(msg) prints to stderr and aborts (exit 1).
+//     stderr; fatal(msg) prints to stderr and aborts (exit 1).
 //   - A console `Logger { threshold, tag }` drops records below `threshold`,
-//     prints to stdout, and prefixes each with an optional component tag. It
+//     prints to stderr, and prefixes each with an optional component tag. It
 //     needs no capability.
 //   - A `FileLogger { threshold, tag, path }` appends filtered records to a file
 //     — a persistent build log kept separate from a program's output. Because it
 //     writes files it carries @cap(File).
 //
 // Levels are plain int32, 0 (TRACE) .. 5 (FATAL); use the level_*() helpers,
-// level_from_name() for config strings, or the numbers directly. There is no
-// stderr primitive yet, so ordinary console output goes to stdout; only fatal()
-// (via the fail built-in) reaches stderr.
+// level_from_name() for config strings, or the numbers directly. Console output
+// goes to stderr (the eprintln built-in), keeping logs separate from a program's
+// stdout.
 
 module std.logging
 
@@ -107,21 +107,21 @@ pub func enabled(int32 threshold, int32 level) -> bool {
     return level >= threshold
 }
 
-// --- Free-function console API (always emits; no threshold) ---
+// --- Free-function console API (always emits to stderr; no threshold) ---
 pub func trace(str msg) -> void {
-    println(format_record(0, msg))
+    eprintln(format_record(0, msg))
 }
 pub func debug(str msg) -> void {
-    println(format_record(1, msg))
+    eprintln(format_record(1, msg))
 }
 pub func info(str msg) -> void {
-    println(format_record(2, msg))
+    eprintln(format_record(2, msg))
 }
 pub func warn(str msg) -> void {
-    println(format_record(3, msg))
+    eprintln(format_record(3, msg))
 }
 pub func error(str msg) -> void {
-    println(format_record(4, msg))
+    eprintln(format_record(4, msg))
 }
 
 // Log at FATAL to stderr and abort the process (exit 1). Never returns.
@@ -143,12 +143,12 @@ pub struct Logger {
     pub int32 threshold
     pub str tag
 
-    // Emit a record to stdout if it meets the threshold.
+    // Emit a record to stderr if it meets the threshold.
     pub func log(int32 level, str msg) -> void {
         if (level < this.threshold) {
             return
         }
-        println(format_tagged(level, this.tag, msg))
+        eprintln(format_tagged(level, this.tag, msg))
     }
 
     pub func trace(str msg) -> void {
