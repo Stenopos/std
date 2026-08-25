@@ -12,6 +12,7 @@ module std.io
 // Read a file and split it into lines (separated by '\n').
 // A trailing newline does not produce a final empty line.
 // A missing or empty file yields an empty list.
+@cap(File)
 pub func read_lines(str path) -> List[str] {
     List[str] lines = list_new()
     str content = read_file(path)
@@ -33,6 +34,7 @@ pub func read_lines(str path) -> List[str] {
 
 // Write a list of lines to a file, one per line, with a trailing newline.
 // Returns true when the write succeeded.
+@cap(File)
 pub func write_lines(str path, List[str] lines) -> bool {
     List[str] parts = list_new()
     for (line in lines) {
@@ -46,6 +48,7 @@ pub func write_lines(str path, List[str] lines) -> bool {
 // Returns true when the write succeeded.
 // (Implemented as read + rewrite until the runtime grows an append mode —
 // fine for small files, not for logs written in a loop.)
+@cap(File)
 pub func append_file(str path, str content) -> bool {
     str combined = read_file(path) + content
     return write_file(path, combined)

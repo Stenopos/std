@@ -11,11 +11,13 @@ module std.os
 
 // Run a shell command; returns its exit code (127 if it could not be run).
 // The command is passed to the system shell, so redirection and pipes work.
+@cap(Process)
 pub func run(str command) -> int32 {
     return exec(command)
 }
 
 // Run a command and return true iff it exited 0 (succeeded).
+@cap(Process)
 pub func run_ok(str command) -> bool {
     return exec(command) == 0
 }
