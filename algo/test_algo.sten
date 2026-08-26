@@ -1,0 +1,38 @@
+// Tests for std.algo — run with:
+//   STENOPOS_STD=... stenopos run std/algo/test_algo.sten
+module std.algo.tests
+
+import std.algo.{reverse_i32, sort_i32, binary_search, unique_i32}
+import std.testing.{expect, expect_eq_int, report}
+
+func main() -> int32 {
+    int32 fails = 0
+
+    List[int32] xs = list_new()
+    xs.push(3)
+    xs.push(1)
+    xs.push(2)
+
+    List[int32] s = sort_i32(xs)
+    fails += expect(s.get(0) == 1 && s.get(1) == 2 && s.get(2) == 3, "sort ascending")
+    fails += expect(xs.get(0) == 3, "sort leaves input untouched")
+
+    List[int32] r = reverse_i32(xs)
+    fails += expect(r.get(0) == 2 && r.get(1) == 1 && r.get(2) == 3, "reverse")
+
+    fails += expect_eq_int(binary_search(s, 2), 1, "binary_search hit")
+    fails += expect_eq_int(binary_search(s, 9), 0 - 1, "binary_search miss")
+    fails += expect_eq_int(binary_search(s, 1), 0, "binary_search first")
+
+    List[int32] dup = list_new()
+    dup.push(1)
+    dup.push(1)
+    dup.push(2)
+    dup.push(2)
+    dup.push(3)
+    List[int32] u = unique_i32(dup)
+    fails += expect_eq_int(cast[int32](u.len()), 3, "unique length")
+    fails += expect(u.get(0) == 1 && u.get(1) == 2 && u.get(2) == 3, "unique values")
+
+    return report(fails)
+}
