@@ -9,6 +9,7 @@ module std.os.tests
 import std.testing.{expect, expect_eq_int, report}
 import std.os.{run, run_ok, argc, arg_at, args, has_flag}
 
+@cap(Process)
 func main() -> int32 {
     int32 fails = 0
 

@@ -15,6 +15,7 @@ func expect(bool cond, str name) -> int32 {
     return 1
 }
 
+@cap(File)
 func test_roundtrip(str path) -> int32 {
     int32 fails = 0
     List[str] lines = list_new()
@@ -33,6 +34,7 @@ func test_roundtrip(str path) -> int32 {
     return fails
 }
 
+@cap(File)
 func test_append(str path) -> int32 {
     int32 fails = 0
     fails += expect(append_file(path, "delta\n"), "append_file succeeds")
@@ -49,6 +51,7 @@ func test_append(str path) -> int32 {
     return fails
 }
 
+@cap(File)
 func test_missing_file() -> int32 {
     int32 fails = 0
     List[str] none = read_lines("/tmp/stenopos_std_io_test_definitely_missing.txt")
@@ -56,6 +59,7 @@ func test_missing_file() -> int32 {
     return fails
 }
 
+@cap(File)
 func main() -> void {
     int32 fails = 0
     str path = "/tmp/stenopos_std_io_test.txt"
