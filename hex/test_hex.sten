@@ -1,0 +1,123 @@
+// Tests for std.hex — run with (from the std checkout):
+//   export STENOPOS_STD=$(pwd)
+//   stenopos run hex/test_hex.sten
+// Prints one ok/FAIL line per check and a PASS/FAIL summary.
+
+module std.hex.tests
+
+import std.hex.{hex_encode, hex_decode}
+
+func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   {name}")
+        return 0
+    }
+    println("  FAIL {name}")
+    return 1
+}
+
+func expect_str(str got, str want, str name) -> int32 {
+    if (got == want) {
+        return expect(true, name)
+    }
+    println("  FAIL {name}: got '{got}', want '{want}'")
+    return 1
+}
+
+func bytes_eq(List[int32] a, List[int32] b) -> bool {
+    if (a.len() != b.len()) {
+        return false
+    }
+    int64 i = 0
+    while (i < a.len()) {
+        if (a.get(i) != b.get(i)) {
+            return false
+        }
+        i = i + 1
+    }
+    return true
+}
+
+func make_bytes_255_0_16() -> List[int32] {
+    List[int32] xs = list_new()
+    xs.push(255)
+    xs.push(0)
+    xs.push(16)
+    return xs
+}
+
+func test_known_vectors() -> int32 {
+    int32 fails = 0
+    fails += expect_str(hex_encode(make_bytes_255_0_16()), "ff0010", "hex_encode known vector")
+    fails += expect(bytes_eq(hex_decode("ff0010"), make_bytes_255_0_16()), "hex_decode known vector")
+    fails += expect_str(hex_encode(list_new()), "", "hex_encode empty")
+    fails += expect(hex_decode("").len() == 0, "hex_decode empty")
+    return fails
+}
+
+func test_round_trip() -> int32 {
+    int32 fails = 0
+
+    // Empty.
+    List[int32] empty = list_new()
+    fails += expect(bytes_eq(hex_decode(hex_encode(empty)), empty), "round trip empty")
+
+    // 1 byte.
+    List[int32] one = list_new()
+    one.push(7)
+    fails += expect(bytes_eq(hex_decode(hex_encode(one)), one), "round trip 1 byte")
+
+    // 2 bytes.
+    List[int32] two = list_new()
+    two.push(1)
+    two.push(254)
+    fails += expect(bytes_eq(hex_decode(hex_encode(two)), two), "round trip 2 bytes")
+
+    // 3 bytes.
+    List[int32] three = list_new()
+    three.push(0)
+    three.push(128)
+    three.push(255)
+    fails += expect(bytes_eq(hex_decode(hex_encode(three)), three), "round trip 3 bytes")
+
+    // Uppercase decode should also round trip to the same bytes.
+    fails += expect(bytes_eq(hex_decode("FF0010"), make_bytes_255_0_16()), "hex_decode accepts uppercase")
+
+    return fails
+}
+
+func test_invalid_input() -> int32 {
+    int32 fails = 0
+
+    int32 caught_odd = 0
+    try {
+        List[int32] bad = hex_decode("abc")
+        println("  unreachable {bad.len()}")
+    } catch (Error err) {
+        caught_odd = 1
+    }
+    fails += expect(caught_odd == 1, "hex_decode odd length throws")
+
+    int32 caught_char = 0
+    try {
+        List[int32] bad = hex_decode("zz")
+        println("  unreachable {bad.len()}")
+    } catch (Error err) {
+        caught_char = 1
+    }
+    fails += expect(caught_char == 1, "hex_decode invalid character throws")
+
+    return fails
+}
+
+func main() -> void {
+    int32 fails = 0
+    println("std.hex tests:")
+    fails += test_known_vectors()
+    fails += test_round_trip()
+    fails += test_invalid_input()
+    if (fails > 0) {
+        fail("FAIL: {fails} check(s) failed")
+    }
+    println("PASS: all std.hex checks passed")
+}

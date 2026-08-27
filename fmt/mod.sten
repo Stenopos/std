@@ -1,0 +1,124 @@
+// Stenopos standard library — fmt module
+// Number and string formatting helpers. Pure Stenopos, no FFI. Radix conversion
+// is done with division/modulo (no bit shifts) so it is width- and sign-clean.
+
+module std.fmt
+
+// The unsigned 32-bit value of an int32's bit pattern, as an int64 (so a
+// negative int32 formats as its unsigned two's-complement view, e.g. -1 -> all
+// ones). 2^32 = 4294967296.
+func u32_of(int32 n) -> int64 {
+    int64 u = cast[int64](n)
+    if (u < 0) {
+        u = u + 4294967296
+    }
+    return u
+}
+
+// One lowercase digit (0..35) for a radix up to 36.
+func radix_digit(int64 d) -> str {
+    str table = "0123456789abcdefghijklmnopqrstuvwxyz"
+    return table.substring(d, d + 1)
+}
+
+// `value` (>= 0) rendered in `base` (2..36). Zero renders as "0".
+func to_radix(int64 value, int64 base) -> str {
+    if (value == 0) {
+        return "0"
+    }
+    str out = ""
+    int64 v = value
+    while (v > 0) {
+        int64 d = v % base
+        out = radix_digit(d) + out
+        v = v / base
+    }
+    return out
+}
+
+// An int32's 32-bit pattern in lowercase hexadecimal (e.g. 255 -> "ff",
+// -1 -> "ffffffff"). No "0x" prefix.
+pub func to_hex(int32 n) -> str {
+    return to_radix(u32_of(n), 16)
+}
+
+// An int32's 32-bit pattern in binary (e.g. 5 -> "101").
+pub func to_binary(int32 n) -> str {
+    return to_radix(u32_of(n), 2)
+}
+
+// An int32's 32-bit pattern in octal (e.g. 8 -> "10").
+pub func to_octal(int32 n) -> str {
+    return to_radix(u32_of(n), 8)
+}
+
+// `s` repeated `n` times ("ab", 3 -> "ababab"); n <= 0 yields "".
+pub func repeat_str(str s, int32 n) -> str {
+    str out = ""
+    int32 i = 0
+    while (i < n) {
+        out = out + s
+        i = i + 1
+    }
+    return out
+}
+
+// `s` left-padded with `pad` (a one-character string) to at least `width`
+// characters. Longer strings are returned unchanged. pad_left("x", 3, " ")
+// -> "  x".
+pub func pad_left(str s, int32 width, str pad) -> str {
+    int32 len = cast[int32](s.len())
+    if (len >= width) {
+        return s
+    }
+    return repeat_str(pad, width - len) + s
+}
+
+// `s` right-padded with `pad` to at least `width` characters.
+pub func pad_right(str s, int32 width, str pad) -> str {
+    int32 len = cast[int32](s.len())
+    if (len >= width) {
+        return s
+    }
+    return s + repeat_str(pad, width - len)
+}
+
+// A non-negative int32 rendered in decimal, zero-padded to `width`
+// (zero_pad(7, 3) -> "007"). Negative values keep their sign then pad the
+// digits (zero_pad(-7, 3) -> "-07" style is NOT done — negatives are rendered
+// as-is without padding to keep the rule simple).
+pub func zero_pad(int32 n, int32 width) -> str {
+    str s = "{n}"
+    if (n < 0) {
+        return s
+    }
+    return pad_left(s, width, "0")
+}
+
+// An int64 in decimal with thousands separators (1234567 -> "1,234,567").
+// Negatives keep their leading minus (-1234 -> "-1,234").
+pub func with_thousands(int64 n) -> str {
+    bool neg = n < 0
+    int64 v = n
+    if (neg) {
+        v = 0 - n
+    }
+    str digits = "{v}"
+    int32 len = cast[int32](digits.len())
+    str out = ""
+    int32 i = 0
+    while (i < len) {
+        // Insert a comma before every group of three from the right, except at
+        // the very start.
+        if (i > 0 && (len - i) % 3 == 0) {
+            out = out + ","
+        }
+        int64 i64 = cast[int64](i)
+        out = out + digits.substring(i64, i64 + 1)
+        i = i + 1
+    }
+    if (neg) {
+        return "-" + out
+    }
+    return out
+}

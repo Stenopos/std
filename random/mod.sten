@@ -1,0 +1,177 @@
+// Stenopos standard library — random module
+// A seeded, deterministic pseudo-random number generator. Pure Stenopos, no FFI.
+//
+// DESIGN: value semantics.
+// Structs (and their fields) are deep-copied on assignment and by-value pass,
+// so an RNG object cannot carry mutable state across calls. Instead the state
+// is a plain `int64` that the caller threads by hand:
+//
+//     int64 s = rng_seed(42)      // normalize a seed into a start state
+//     s = rng_next(s)             // advance; keep the returned value
+//     int32 r = rng_range(s, 0, 6)
+//     s = rng_next(s)             // advance again before the next draw
+//     ...
+//
+// The generator is a Lehmer / MINSTD multiplicative congruential generator:
+//     state = (state * 48271) % 2147483647
+// on the prime modulus 2^31 - 1. It stays inside int64 with no overflow (the
+// widest intermediate is 48271 * (2^31-2) ~= 1.0e14, far below int64's range),
+// so no wrapping and no overflow-abort are needed. State lives in [1, 2^31-2]
+// and the full period is 2^31 - 2.
+//
+// SECURITY: this is a *statistical* generator for simulations, tests, sampling,
+// and games. It is fully predictable from its state and is NOT cryptographically
+// secure — never use it for keys, tokens, nonces, or anything an attacker must
+// not guess. Use a dedicated CSPRNG for those.
+
+module std.random
+
+// ---------------------------------------------------------------------------
+// Internal constants (functions, since the language has no module constants)
+// ---------------------------------------------------------------------------
+
+// The prime modulus 2^31 - 1 the generator runs on. State is in [1, modulus-1].
+pub func rng_modulus() -> int64 {
+    return cast[int64](2147483647)
+}
+
+// The multiplier used by the MINSTD recurrence.
+pub func rng_multiplier() -> int64 {
+    return cast[int64](48271)
+}
+
+// The largest value rng_u32 can return (modulus - 1 == 2^31 - 2).
+pub func rng_max_u32() -> int32 {
+    return 2147483646
+}
+
+// ---------------------------------------------------------------------------
+// Core: state threading
+// ---------------------------------------------------------------------------
+
+// Advance the generator one step and return the new state.
+// Thread the returned value into the next call; the same input state always
+// yields the same output state (this is what makes sequences reproducible).
+pub func rng_next(int64 state) -> int64 {
+    return (state * 48271) % 2147483647
+}
+
+// Normalize an arbitrary seed into a valid start state and scramble it once.
+// Any int64 (including 0 or a negative value) is accepted; the same seed always
+// produces the same start state, and thus the same whole sequence.
+pub func rng_seed(int64 seed) -> int64 {
+    int64 s = seed % 2147483647
+    if (s < 0) {
+        s += 2147483647
+    }
+    if (s == 0) {
+        // 0 is a fixed point of the recurrence, so map it to a live state.
+        s = 1
+    }
+    return rng_next(s)
+}
+
+// ---------------------------------------------------------------------------
+// Deriving values from a state
+// ---------------------------------------------------------------------------
+
+// A non-negative int32 drawn from the state, in the range [0, 2^31 - 2].
+// The state itself is a 31-bit value, so it is returned directly.
+pub func rng_u32(int64 state) -> int32 {
+    return cast[int32](state)
+}
+
+// A float64 in [0.0, 1.0). Uniform to ~31 bits of resolution.
+pub func rng_float(int64 state) -> float64 {
+    return cast[float64](cast[int32](state)) / 2147483648.0
+}
+
+// True or false with (very close to) equal probability. Reads a high bit of the
+// state rather than the low bit, which mixes better.
+pub func rng_bool(int64 state) -> bool {
+    return cast[int32](state) >= 1073741824
+}
+
+// An int32 in the half-open range [lo, hi) (hi exclusive). Throws when the range
+// is empty or reversed (lo >= hi). Note: uses modulo, so for very wide ranges
+// the low end is very slightly favored (modulo bias) — fine for general use.
+pub func rng_range(int64 state, int32 lo, int32 hi) -> int32 {
+    if (lo >= hi) {
+        throw("rng_range: empty range [{lo}, {hi})")
+    }
+    int32 span = hi - lo
+    return lo + cast[int32](state) % span
+}
+
+// ---------------------------------------------------------------------------
+// Convenience helpers
+// ---------------------------------------------------------------------------
+
+// An int32 in [0, n). Throws when n <= 0.
+pub func rng_below(int64 state, int32 n) -> int32 {
+    if (n <= 0) {
+        throw("rng_below: bound must be positive, got {n}")
+    }
+    return rng_range(state, 0, n)
+}
+
+// A dice roll in [1, sides]. Throws when sides <= 0. rng_dice(s, 6) -> 1..6.
+pub func rng_dice(int64 state, int32 sides) -> int32 {
+    if (sides <= 0) {
+        throw("rng_dice: sides must be positive, got {sides}")
+    }
+    return 1 + rng_below(state, sides)
+}
+
+// A coin flip. A readable alias for rng_bool.
+pub func rng_coin(int64 state) -> bool {
+    return rng_bool(state)
+}
+
+// Either -1 or +1, each with about equal probability.
+pub func rng_sign(int64 state) -> int32 {
+    if (rng_bool(state)) {
+        return 1
+    }
+    return -1
+}
+
+// A single byte value in [0, 255].
+pub func rng_byte(int64 state) -> int32 {
+    return rng_below(state, 256)
+}
+
+// A float64 in [lo, hi). If hi <= lo the result collapses toward lo.
+pub func rng_float_range(int64 state, float64 lo, float64 hi) -> float64 {
+    return lo + rng_float(state) * (hi - lo)
+}
+
+// True with probability p (clamped to [0, 1]). rng_chance(s, 0.25) is true ~25%
+// of the time. p <= 0 is never true; p >= 1 is always true.
+pub func rng_chance(int64 state, float64 p) -> bool {
+    if (p <= 0.0) {
+        return false
+    }
+    if (p >= 1.0) {
+        return true
+    }
+    return rng_float(state) < p
+}
+
+// Shuffle a list of int32 in place (Fisher-Yates) and return the advanced state.
+// The list argument is borrowed, so the reordering persists to the caller; the
+// returned state must be threaded on for any further draws. Same start state +
+// same list => same permutation (reproducible shuffles).
+pub func rng_shuffle_i32(List[int32] xs, int64 state) -> int64 {
+    int64 s = state
+    int32 i = cast[int32](xs.len()) - 1
+    while (i > 0) {
+        s = rng_next(s)
+        int32 j = rng_range(s, 0, i + 1)
+        int32 tmp = xs.get(i)
+        xs.set(i, xs.get(j))
+        xs.set(j, tmp)
+        i -= 1
+    }
+    return s
+}

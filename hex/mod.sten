@@ -1,0 +1,71 @@
+// Stenopos standard library — hex module
+// Lowercase hex encoding/decoding for byte buffers. Pure Stenopos, no FFI.
+// A byte buffer is `List[int32]` with each element in 0..255.
+
+module std.hex
+
+// Map a nibble (0..15) to its lowercase hex character. Not exported: only
+// used internally by hex_decode's inverse, hex_encode, below.
+func hex_digit(int64 nibble) -> str {
+    str digits = "0123456789abcdef"
+    return digits.substring(nibble, nibble + 1)
+}
+
+// Map a hex character's byte code to its nibble value (0..15), or -1 for a
+// non-hex character. Returning a sentinel (rather than throwing here) means the
+// throw happens in the caller's own frame, where scope-exit frees run — a helper
+// that threw would leave the caller's partial buffer to leak across the unwind.
+func hex_nibble(int32 c) -> int32 {
+    if (c >= '0' && c <= '9') {
+        return c - '0'
+    }
+    if (c >= 'a' && c <= 'f') {
+        return c - 'a' + 10
+    }
+    if (c >= 'A' && c <= 'F') {
+        return c - 'A' + 10
+    }
+    return 0 - 1
+}
+
+// Encode a byte buffer as a lowercase hex string, two characters per byte
+// (e.g. [255, 0, 16] -> "ff0010"). An empty list encodes to "".
+pub func hex_encode(List[int32] bytes) -> str {
+    str out = ""
+    for (b in bytes) {
+        int64 hi = cast[int64](b / 16)
+        int64 lo = cast[int64](b % 16)
+        out = out + hex_digit(hi) + hex_digit(lo)
+    }
+    return out
+}
+
+// Decode a lowercase-or-uppercase hex string back to its byte buffer. The
+// input must have an even length and consist only of hex digits (0-9, a-f,
+// A-F); throws("...") otherwise.
+//
+// Security note: this function does not interpret or sanitize the decoded
+// bytes — if the input `str` is `@tainted`, the resulting `List[int32]`
+// carries the same taint forward (decoding is not a sanitizer). Callers that
+// need trusted bytes must sanitize/validate downstream, not rely on
+// hex_decode to have done it.
+pub func hex_decode(str s) -> List[int32] {
+    int64 n = s.len()
+    if (n % 2 != 0) {
+        throw("hex_decode: odd-length input")
+    }
+    List[int32] out = list_new()
+    int64 i = 0
+    while (i < n) {
+        int32 hi = hex_nibble(s.byte_at(i))
+        int32 lo = hex_nibble(s.byte_at(i + 1))
+        if (hi < 0 || lo < 0) {
+            // Throwing HERE (not in hex_nibble) means this frame owns `out`, so
+            // the compiler's scope-exit frees release it as the throw unwinds.
+            throw("hex_decode: invalid hex character")
+        }
+        out.push(hi * 16 + lo)
+        i = i + 2
+    }
+    return out
+}

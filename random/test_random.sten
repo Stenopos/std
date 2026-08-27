@@ -1,0 +1,277 @@
+// Tests for std.random — run with:
+//   stenopos-cli run std/random/test_random.sten
+// Prints one ok/FAIL line per check and a PASS/FAIL summary. State is threaded
+// functionally throughout, exactly as callers are expected to use the module.
+
+module std.random.tests
+
+import std.random.{rng_seed, rng_next, rng_u32, rng_range, rng_bool, rng_float}
+import std.random.{rng_below, rng_dice, rng_coin, rng_sign, rng_byte}
+import std.random.{rng_float_range, rng_chance, rng_shuffle_i32, rng_max_u32}
+
+func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   {name}")
+        return 0
+    }
+    println("  FAIL {name}")
+    return 1
+}
+
+// The key property: the same seed reproduces the exact same sequence.
+func test_determinism() -> int32 {
+    int32 fails = 0
+    int64 a = rng_seed(42)
+    int64 b = rng_seed(42)
+    bool same = true
+    int32 i = 0
+    while (i < 500) {
+        a = rng_next(a)
+        b = rng_next(b)
+        if (rng_u32(a) != rng_u32(b)) {
+            same = false
+        }
+        i += 1
+    }
+    fails += expect(same, "same seed reproduces identical sequence")
+
+    // A different seed should not track the first sequence step-for-step.
+    int64 c = rng_seed(43)
+    int64 d = rng_seed(42)
+    int32 diffs = 0
+    int32 k = 0
+    while (k < 100) {
+        c = rng_next(c)
+        d = rng_next(d)
+        if (rng_u32(c) != rng_u32(d)) {
+            diffs += 1
+        }
+        k += 1
+    }
+    fails += expect(diffs > 90, "different seeds diverge")
+    return fails
+}
+
+func test_range() -> int32 {
+    int32 fails = 0
+    int64 s = rng_seed(7)
+    bool in_bounds = true
+    int32 i = 0
+    while (i < 2000) {
+        s = rng_next(s)
+        int32 r = rng_range(s, 0, 10)
+        if (r < 0 || r >= 10) {
+            in_bounds = false
+        }
+        i += 1
+    }
+    fails += expect(in_bounds, "rng_range(0,10) always in [0,10)")
+
+    // Ranges that do not start at zero, and a single-value range.
+    s = rng_next(s)
+    int32 one = rng_range(s, 5, 6)
+    fails += expect(one == 5, "single-value range yields the only value")
+
+    bool shifted_ok = true
+    int32 j = 0
+    while (j < 500) {
+        s = rng_next(s)
+        int32 v = rng_range(s, -3, 4)
+        if (v < -3 || v >= 4) {
+            shifted_ok = false
+        }
+        j += 1
+    }
+    fails += expect(shifted_ok, "rng_range(-3,4) always in [-3,4)")
+
+    int32 caught = 0
+    try {
+        int32 bad = rng_range(s, 5, 5)
+        println("  unreachable {bad}")
+    } catch (Error err) {
+        caught = 1
+    }
+    fails += expect(caught == 1, "empty range throws")
+    return fails
+}
+
+func test_bool_distribution() -> int32 {
+    int32 fails = 0
+    int64 s = rng_seed(1234)
+    int32 trues = 0
+    int32 total = 2000
+    int32 i = 0
+    while (i < total) {
+        s = rng_next(s)
+        if (rng_bool(s)) {
+            trues += 1
+        }
+        i += 1
+    }
+    int32 falses = total - trues
+    // Not all the same value...
+    fails += expect(trues > 0 && falses > 0, "rng_bool produces both values")
+    // ...and roughly balanced (between 35% and 65%).
+    fails += expect(trues > 700 && trues < 1300, "rng_bool is roughly balanced")
+    return fails
+}
+
+func test_float() -> int32 {
+    int32 fails = 0
+    int64 s = rng_seed(99)
+    bool in_unit = true
+    bool saw_low = false
+    bool saw_high = false
+    int32 i = 0
+    while (i < 2000) {
+        s = rng_next(s)
+        float64 f = rng_float(s)
+        if (f < 0.0 || f >= 1.0) {
+            in_unit = false
+        }
+        if (f < 0.5) {
+            saw_low = true
+        }
+        if (f >= 0.5) {
+            saw_high = true
+        }
+        i += 1
+    }
+    fails += expect(in_unit, "rng_float always in [0.0, 1.0)")
+    fails += expect(saw_low && saw_high, "rng_float spans both halves")
+
+    int64 t = rng_seed(5)
+    bool fr_ok = true
+    int32 j = 0
+    while (j < 500) {
+        t = rng_next(t)
+        float64 v = rng_float_range(t, 10.0, 20.0)
+        if (v < 10.0 || v >= 20.0) {
+            fr_ok = false
+        }
+        j += 1
+    }
+    fails += expect(fr_ok, "rng_float_range(10,20) always in [10,20)")
+    return fails
+}
+
+func test_helpers() -> int32 {
+    int32 fails = 0
+    int64 s = rng_seed(2026)
+
+    bool below_ok = true
+    bool dice_ok = true
+    bool byte_ok = true
+    bool sign_ok = true
+    int32 i = 0
+    while (i < 2000) {
+        s = rng_next(s)
+        int32 b = rng_below(s, 7)
+        if (b < 0 || b >= 7) {
+            below_ok = false
+        }
+        int32 d = rng_dice(s, 6)
+        if (d < 1 || d > 6) {
+            dice_ok = false
+        }
+        int32 by = rng_byte(s)
+        if (by < 0 || by > 255) {
+            byte_ok = false
+        }
+        int32 sg = rng_sign(s)
+        if (sg != -1 && sg != 1) {
+            sign_ok = false
+        }
+        i += 1
+    }
+    fails += expect(below_ok, "rng_below in [0,n)")
+    fails += expect(dice_ok, "rng_dice in [1,sides]")
+    fails += expect(byte_ok, "rng_byte in [0,255]")
+    fails += expect(sign_ok, "rng_sign is -1 or 1")
+
+    // rng_coin is an alias for rng_bool over the same state.
+    s = rng_next(s)
+    fails += expect(rng_coin(s) == rng_bool(s), "rng_coin matches rng_bool")
+
+    // rng_chance edge probabilities are exact.
+    s = rng_next(s)
+    fails += expect(!rng_chance(s, 0.0), "rng_chance(0) never true")
+    fails += expect(rng_chance(s, 1.0), "rng_chance(1) always true")
+
+    // u32 never exceeds the documented maximum.
+    bool u_ok = true
+    int32 k = 0
+    while (k < 500) {
+        s = rng_next(s)
+        int32 u = rng_u32(s)
+        if (u < 0 || u > rng_max_u32()) {
+            u_ok = false
+        }
+        k += 1
+    }
+    fails += expect(u_ok, "rng_u32 within [0, max]")
+    return fails
+}
+
+func test_shuffle() -> int32 {
+    int32 fails = 0
+    int32 n = 10
+
+    // Build 0..n-1 in two identical lists.
+    List[int32] xs = list_new()
+    List[int32] ys = list_new()
+    int32 sum_before = 0
+    int32 i = 0
+    while (i < n) {
+        xs.push(i)
+        ys.push(i)
+        sum_before += i
+        i += 1
+    }
+
+    // Same seed => same permutation (deterministic shuffle).
+    int64 sa = rng_shuffle_i32(xs, rng_seed(777))
+    int64 sb = rng_shuffle_i32(ys, rng_seed(777))
+    discard sa
+    discard sb
+
+    bool same_perm = true
+    int32 sum_after = 0
+    int32 j = 0
+    while (j < n) {
+        if (xs.get(j) != ys.get(j)) {
+            same_perm = false
+        }
+        sum_after += xs.get(j)
+        j += 1
+    }
+    fails += expect(same_perm, "same seed shuffles to same order")
+    fails += expect(sum_after == sum_before, "shuffle preserves the multiset (sum)")
+
+    // A shuffle usually reorders at least something.
+    bool moved = false
+    int32 k = 0
+    while (k < n) {
+        if (xs.get(k) != k) {
+            moved = true
+        }
+        k += 1
+    }
+    fails += expect(moved, "shuffle actually reorders")
+    return fails
+}
+
+func main() -> void {
+    int32 fails = 0
+    println("std.random tests:")
+    fails += test_determinism()
+    fails += test_range()
+    fails += test_bool_distribution()
+    fails += test_float()
+    fails += test_helpers()
+    fails += test_shuffle()
+    if (fails > 0) {
+        fail("FAIL: {fails} check(s) failed")
+    }
+    println("PASS: all std.random checks passed")
+}

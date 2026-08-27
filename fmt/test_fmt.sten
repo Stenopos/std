@@ -1,0 +1,67 @@
+module std.fmt.tests
+
+import std.fmt.{to_hex, to_binary, to_octal, repeat_str, pad_left, pad_right, zero_pad, with_thousands}
+
+func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   {name}")
+        return 0
+    }
+    println("  FAIL {name}")
+    return 1
+}
+
+func expect_str(str got, str want, str name) -> int32 {
+    if (got == want) {
+        return expect(true, name)
+    }
+    println("  FAIL {name}: got '{got}', want '{want}'")
+    return 1
+}
+
+func test_radix() -> int32 {
+    int32 fails = 0
+    fails += expect_str(to_hex(255), "ff", "to_hex 255")
+    fails += expect_str(to_hex(0), "0", "to_hex 0")
+    fails += expect_str(to_hex(16), "10", "to_hex 16")
+    fails += expect_str(to_hex(0 - 1), "ffffffff", "to_hex -1 (unsigned view)")
+    fails += expect_str(to_binary(5), "101", "to_binary 5")
+    fails += expect_str(to_binary(0), "0", "to_binary 0")
+    fails += expect_str(to_octal(8), "10", "to_octal 8")
+    fails += expect_str(to_octal(64), "100", "to_octal 64")
+    return fails
+}
+
+func test_pad_repeat() -> int32 {
+    int32 fails = 0
+    fails += expect_str(repeat_str("ab", 3), "ababab", "repeat_str ab x3")
+    fails += expect_str(repeat_str("x", 0), "", "repeat_str x0 empty")
+    fails += expect_str(pad_left("x", 3, " "), "  x", "pad_left width 3")
+    fails += expect_str(pad_left("abcd", 3, " "), "abcd", "pad_left no-op when longer")
+    fails += expect_str(pad_right("x", 3, "."), "x..", "pad_right width 3")
+    fails += expect_str(zero_pad(7, 3), "007", "zero_pad 7 -> 007")
+    fails += expect_str(zero_pad(123, 3), "123", "zero_pad exact width")
+    return fails
+}
+
+func test_thousands() -> int32 {
+    int32 fails = 0
+    fails += expect_str(with_thousands(cast[int64](1234567)), "1,234,567", "thousands 1234567")
+    fails += expect_str(with_thousands(cast[int64](0)), "0", "thousands 0")
+    fails += expect_str(with_thousands(cast[int64](999)), "999", "thousands under 1000")
+    fails += expect_str(with_thousands(cast[int64](1000)), "1,000", "thousands 1000")
+    fails += expect_str(with_thousands(cast[int64](0 - 1234)), "-1,234", "thousands negative")
+    return fails
+}
+
+func main() -> void {
+    int32 fails = 0
+    println("std.fmt tests:")
+    fails += test_radix()
+    fails += test_pad_repeat()
+    fails += test_thousands()
+    if (fails > 0) {
+        fail("FAIL: {fails} check(s) failed")
+    }
+    println("PASS: all std.fmt checks passed")
+}
