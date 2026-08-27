@@ -1,0 +1,77 @@
+module std.sort.tests
+
+import std.sort.{sort_i32, sort_str, binary_search_i32, is_sorted_i32, is_sorted_str}
+
+func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   {name}")
+        return 0
+    }
+    println("  FAIL {name}")
+    return 1
+}
+
+func li32(int32 a, int32 b, int32 c, int32 d, int32 e) -> List[int32] {
+    List[int32] xs = list_new()
+    xs.push(a)
+    xs.push(b)
+    xs.push(c)
+    xs.push(d)
+    xs.push(e)
+    return xs
+}
+
+func eq5(List[int32] xs, int32 a, int32 b, int32 c, int32 d, int32 e) -> bool {
+    if (xs.len() != 5) {
+        return false
+    }
+    return xs.get(0) == a && xs.get(1) == b && xs.get(2) == c && xs.get(3) == d && xs.get(4) == e
+}
+
+func test_sort_i32() -> int32 {
+    int32 fails = 0
+    List[int32] input = li32(3, 1, 4, 1, 5)
+    List[int32] out = sort_i32(input)
+    fails += expect(eq5(out, 1, 1, 3, 4, 5), "sort_i32 sorts ascending with dups")
+    fails += expect(eq5(input, 3, 1, 4, 1, 5), "sort_i32 leaves the argument unchanged (value semantics)")
+    fails += expect(is_sorted_i32(out), "sort_i32 output is_sorted")
+    List[int32] empty = list_new()
+    fails += expect(sort_i32(empty).len() == 0, "sort_i32 empty stays empty")
+    fails += expect(is_sorted_i32(sort_i32(li32(5, 4, 3, 2, 1))), "sort_i32 reverse-sorted")
+    return fails
+}
+
+func test_sort_str() -> int32 {
+    int32 fails = 0
+    List[str] xs = list_new()
+    xs.push("banana")
+    xs.push("apple")
+    xs.push("cherry")
+    xs.push("apple")
+    List[str] out = sort_str(xs)
+    fails += expect(out.get(0) == "apple" && out.get(1) == "apple" && out.get(2) == "banana" && out.get(3) == "cherry", "sort_str lexicographic")
+    fails += expect(is_sorted_str(out), "sort_str output is_sorted")
+    return fails
+}
+
+func test_binary_search() -> int32 {
+    int32 fails = 0
+    List[int32] xs = sort_i32(li32(3, 1, 4, 1, 5))
+    fails += expect(binary_search_i32(xs, 4) == 3, "bsearch finds 4")
+    fails += expect(binary_search_i32(xs, 5) == 4, "bsearch finds 5 (last)")
+    fails += expect(binary_search_i32(xs, 2) == (0 - 1), "bsearch misses 2")
+    fails += expect(binary_search_i32(list_new(), 1) == (0 - 1), "bsearch empty")
+    return fails
+}
+
+func main() -> void {
+    int32 fails = 0
+    println("std.sort tests:")
+    fails += test_sort_i32()
+    fails += test_sort_str()
+    fails += test_binary_search()
+    if (fails > 0) {
+        fail("FAIL: {fails} check(s) failed")
+    }
+    println("PASS: all std.sort checks passed")
+}

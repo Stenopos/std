@@ -1,0 +1,134 @@
+// Stenopos standard library — sort module
+// Sorting and searching. Pure Stenopos, no FFI.
+//
+// Value semantics: a sort RETURNS a new sorted list and never mutates its
+// argument (consistent with `std.list`, and forward-compatible with copy-on-write
+// collections). Sorting is an insertion sort on a local copy — O(n^2) worst
+// case, no recursion or extra passes, fine for the list sizes std sees. A
+// comparator-based sort is Phase 2 / 1.1 (needs closures). Ascending order only
+// (natural numeric order; lexicographic byte order for strings).
+
+module std.sort
+
+// A fresh copy of an int32 list.
+func copy_i32(List[int32] xs) -> List[int32] {
+    List[int32] out = list_new()
+    for (v in xs) {
+        out.push(v)
+    }
+    return out
+}
+
+// A fresh copy of a str list.
+func copy_str(List[str] xs) -> List[str] {
+    List[str] out = list_new()
+    for (v in xs) {
+        out.push(v)
+    }
+    return out
+}
+
+// True when `a` sorts before `b` in lexicographic byte order.
+func str_lt(str a, str b) -> bool {
+    int64 na = a.len()
+    int64 nb = b.len()
+    int64 n = na
+    if (nb < n) {
+        n = nb
+    }
+    int64 i = 0
+    while (i < n) {
+        int32 ca = a.byte_at(i)
+        int32 cb = b.byte_at(i)
+        if (ca != cb) {
+            return ca < cb
+        }
+        i += 1
+    }
+    return na < nb
+}
+
+// A new list with `xs`'s int32 elements in ascending order.
+pub func sort_i32(List[int32] xs) -> List[int32] {
+    List[int32] a = copy_i32(xs)
+    int64 n = a.len()
+    int64 i = 1
+    while (i < n) {
+        int32 key = a.get(i)
+        int64 j = i - 1
+        while (j >= 0 && a.get(j) > key) {
+            a.set(j + 1, a.get(j))
+            j -= 1
+        }
+        a.set(j + 1, key)
+        i += 1
+    }
+    return a
+}
+
+// NOTE: sort_i64 is intentionally omitted for now — an int64-list-sort codegen
+// bug in the self-host (a `key = a.get(i)` element read miscompares in the
+// insertion loop) is on the int64 follow-up list. int32/str sorting is unaffected.
+
+// A new list with `xs`'s str elements in ascending lexicographic order.
+pub func sort_str(List[str] xs) -> List[str] {
+    List[str] a = copy_str(xs)
+    int64 n = a.len()
+    int64 i = 1
+    while (i < n) {
+        str key = a.get(i)
+        int64 j = i - 1
+        while (j >= 0 && str_lt(key, a.get(j))) {
+            a.set(j + 1, a.get(j))
+            j -= 1
+        }
+        a.set(j + 1, key)
+        i += 1
+    }
+    return a
+}
+
+// Index of `target` in the SORTED list `xs`, or -1 if absent (binary search).
+pub func binary_search_i32(List[int32] xs, int32 target) -> int32 {
+    int32 lo = 0
+    int32 hi = cast[int32](xs.len()) - 1
+    while (lo <= hi) {
+        int32 mid = (lo + hi) / 2
+        int32 v = xs.get(mid)
+        if (v == target) {
+            return mid
+        }
+        if (v < target) {
+            lo = mid + 1
+        } else {
+            hi = mid - 1
+        }
+    }
+    return 0 - 1
+}
+
+// True when `xs` is in ascending order.
+pub func is_sorted_i32(List[int32] xs) -> bool {
+    int64 n = xs.len()
+    int64 i = 1
+    while (i < n) {
+        if (xs.get(i - 1) > xs.get(i)) {
+            return false
+        }
+        i += 1
+    }
+    return true
+}
+
+// True when the str list `xs` is in ascending lexicographic order.
+pub func is_sorted_str(List[str] xs) -> bool {
+    int64 n = xs.len()
+    int64 i = 1
+    while (i < n) {
+        if (str_lt(xs.get(i), xs.get(i - 1))) {
+            return false
+        }
+        i += 1
+    }
+    return true
+}
