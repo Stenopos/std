@@ -1,0 +1,74 @@
+module std.hash.tests
+
+import std.hash.{fnv1a_32_str, fnv1a_32_bytes, djb2_str, crc32_str, crc32_bytes}
+
+func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   {name}")
+        return 0
+    }
+    println("  FAIL {name}")
+    return 1
+}
+
+func expect_eq(int64 got, int64 want, str name) -> int32 {
+    if (got == want) {
+        return expect(true, name)
+    }
+    println("  FAIL {name}: got {got}, want {want}")
+    return 1
+}
+
+func bytes_of(str s) -> List[int32] {
+    List[int32] b = list_new()
+    int64 i = 0
+    int64 n = s.len()
+    while (i < n) {
+        b.push(s.byte_at(i))
+        i = i + 1
+    }
+    return b
+}
+
+func test_fnv() -> int32 {
+    int32 fails = 0
+    // FNV-1a-32 of the empty string is the offset basis.
+    fails += expect_eq(fnv1a_32_str(""), 2166136261, "fnv1a_32 empty = offset basis")
+    // Known vector: FNV-1a-32 of "a" = 0xE40C292C = 3826002220.
+    fails += expect_eq(fnv1a_32_str("a"), 3826002220, "fnv1a_32 'a'")
+    // Known vector: FNV-1a-32 of "foobar" = 0xBF9CF968 = 3214735720.
+    fails += expect_eq(fnv1a_32_str("foobar"), 3214735720, "fnv1a_32 'foobar'")
+    // The bytes and string paths agree.
+    fails += expect_eq(fnv1a_32_bytes(bytes_of("foobar")), fnv1a_32_str("foobar"), "fnv1a_32 bytes == str")
+    return fails
+}
+
+func test_crc32() -> int32 {
+    int32 fails = 0
+    fails += expect_eq(crc32_str(""), 0, "crc32 empty = 0")
+    // The canonical CRC-32 check value.
+    fails += expect_eq(crc32_str("123456789"), 3421780262, "crc32 '123456789' (0xCBF43926)")
+    fails += expect_eq(crc32_str("The quick brown fox jumps over the lazy dog"), 1095738169, "crc32 quick-brown-fox (0x414FA339)")
+    fails += expect_eq(crc32_bytes(bytes_of("123456789")), crc32_str("123456789"), "crc32 bytes == str")
+    return fails
+}
+
+func test_determinism() -> int32 {
+    int32 fails = 0
+    fails += expect(fnv1a_32_str("hello") == fnv1a_32_str("hello"), "fnv deterministic")
+    fails += expect(djb2_str("hello") != djb2_str("world"), "djb2 distinguishes inputs")
+    fails += expect(fnv1a_32_str("hello") != fnv1a_32_str("hellp"), "fnv distinguishes near inputs")
+    return fails
+}
+
+func main() -> void {
+    int32 fails = 0
+    println("std.hash tests:")
+    fails += test_fnv()
+    fails += test_crc32()
+    fails += test_determinism()
+    if (fails > 0) {
+        fail("FAIL: {fails} check(s) failed")
+    }
+    println("PASS: all std.hash checks passed")
+}

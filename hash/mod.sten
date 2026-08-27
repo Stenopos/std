@@ -1,0 +1,95 @@
+// Stenopos standard library — hash module
+// Non-cryptographic hash functions (for hash tables, checksums, dedup — NOT for
+// security; use std.crypto for that). Pure Stenopos, no FFI. Values are computed
+// in int64 and masked to their width, so no uint32-literal gymnastics are needed
+// and the results are stable across both compilers.
+
+module std.hash
+
+// 2^32, used to mask a running value back to 32 bits.
+func mask32() -> int64 {
+    return 4294967296
+}
+
+// FNV-1a, 32-bit. offset basis 2166136261, prime 16777619. Returns the 32-bit
+// hash as an int64 in 0..4294967295.
+pub func fnv1a_32_bytes(List[int32] bytes) -> int64 {
+    int64 h = 2166136261
+    int64 n = bytes.len()
+    int64 i = 0
+    while (i < n) {
+        int64 c = cast[int64](bytes.get(i))
+        h = h ^ c
+        h = (h * 16777619) % mask32()
+        i = i + 1
+    }
+    return h
+}
+
+// FNV-1a, 32-bit, over a string's bytes.
+pub func fnv1a_32_str(str s) -> int64 {
+    int64 h = 2166136261
+    int64 n = s.len()
+    int64 i = 0
+    while (i < n) {
+        int64 c = cast[int64](s.byte_at(i))
+        h = h ^ c
+        h = (h * 16777619) % mask32()
+        i = i + 1
+    }
+    return h
+}
+
+// djb2 (Bernstein), 64-bit: h = h * 33 + c. Uses wrapping arithmetic (intended
+// modular overflow, like any hash mixer).
+pub func djb2_str(str s) -> int64 {
+    int64 h = 5381
+    int64 n = s.len()
+    int64 i = 0
+    while (i < n) {
+        int64 c = cast[int64](s.byte_at(i))
+        h = wrapping_add(wrapping_mul(h, 33), c)
+        i = i + 1
+    }
+    return h
+}
+
+// One CRC-32 (IEEE polynomial 0xEDB88320) step folded over a running value.
+func crc32_step(int64 crc, int64 byte) -> int64 {
+    int64 c = crc ^ byte
+    int64 k = 0
+    while (k < 8) {
+        int64 low = c % 2
+        c = c / 2                        // logical >> 1 (c stays non-negative)
+        if (low == 1) {
+            c = c ^ 3988292384           // 0xEDB88320
+        }
+        k = k + 1
+    }
+    return c
+}
+
+// CRC-32 (IEEE, as used by zip/gzip/png) of a byte buffer. Returns the checksum
+// as an int64 in 0..4294967295.
+pub func crc32_bytes(List[int32] bytes) -> int64 {
+    int64 crc = 4294967295               // 0xFFFFFFFF
+    int64 n = bytes.len()
+    int64 i = 0
+    while (i < n) {
+        crc = crc32_step(crc, cast[int64](bytes.get(i)))
+        i = i + 1
+    }
+    return crc ^ 4294967295
+}
+
+// CRC-32 over a string's bytes.
+pub func crc32_str(str s) -> int64 {
+    int64 crc = 4294967295
+    int64 n = s.len()
+    int64 i = 0
+    while (i < n) {
+        crc = crc32_step(crc, cast[int64](s.byte_at(i)))
+        i = i + 1
+    }
+    return crc ^ 4294967295
+}

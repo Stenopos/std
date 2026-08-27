@@ -1,0 +1,148 @@
+// Stenopos standard library — base64 module
+// Standard base64 (RFC 4648, `+`/`/` alphabet, `=` padding) encoding and
+// decoding for byte buffers. Pure Stenopos, no FFI.
+// A byte buffer is `List[int32]` with each element in 0..255.
+//
+// The 6-bit grouping is done with plain integer arithmetic (multiply /
+// divide / modulo) rather than shifts and masks, to avoid mixed-type
+// bitwise operands in the self-hosted compiler's subset.
+
+module std.base64
+
+// Not exported: only used internally to map a 6-bit group (0..63) to its
+// base64 character, and back.
+func b64_alphabet() -> str {
+    return "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+}
+
+func b64_char(int64 six_bits) -> str {
+    str alphabet = b64_alphabet()
+    return alphabet.substring(six_bits, six_bits + 1)
+}
+
+// Map a base64 alphabet character's byte code to its 6-bit value (0..63).
+// Throws on anything that isn't A-Z, a-z, 0-9, `+`, or `/` (callers handle
+// `=` padding themselves before calling this).
+func b64_value(int32 c) -> int32 {
+    int32 v = 0 - 1
+    if (c >= 'A' && c <= 'Z') {
+        v = c - 'A'
+    } else if (c >= 'a' && c <= 'z') {
+        v = c - 'a' + 26
+    } else if (c >= '0' && c <= '9') {
+        v = c - '0' + 52
+    } else if (c == '+') {
+        v = 62
+    } else if (c == '/') {
+        v = 63
+    }
+    // Return -1 for a non-alphabet byte (do NOT throw here): the caller throws in
+    // its own frame, where scope-exit frees release its partial buffer.
+    return v
+}
+
+// Encode a byte buffer as standard base64 text, padded with `=` to a
+// multiple of 4 characters (e.g. "Man" -> "TWFu", "Ma" -> "TWE=",
+// "M" -> "TQ=="). An empty list encodes to "".
+pub func base64_encode(List[int32] bytes) -> str {
+    int64 n = bytes.len()
+    str out = ""
+    int64 i = 0
+    while (i + 3 <= n) {
+        int32 b0 = bytes.get(i)
+        int32 b1 = bytes.get(i + 1)
+        int32 b2 = bytes.get(i + 2)
+        int32 combined = b0 * 65536 + b1 * 256 + b2
+        out = out + b64_char(cast[int64]((combined / 262144) % 64))
+        out = out + b64_char(cast[int64]((combined / 4096) % 64))
+        out = out + b64_char(cast[int64]((combined / 64) % 64))
+        out = out + b64_char(cast[int64](combined % 64))
+        i = i + 3
+    }
+    int64 remaining = n - i
+    if (remaining == 1) {
+        int32 b0 = bytes.get(i)
+        int32 combined = b0 * 65536
+        out = out + b64_char(cast[int64]((combined / 262144) % 64))
+        out = out + b64_char(cast[int64]((combined / 4096) % 64))
+        out = out + "=="
+    } else if (remaining == 2) {
+        int32 b0 = bytes.get(i)
+        int32 b1 = bytes.get(i + 1)
+        int32 combined = b0 * 65536 + b1 * 256
+        out = out + b64_char(cast[int64]((combined / 262144) % 64))
+        out = out + b64_char(cast[int64]((combined / 4096) % 64))
+        out = out + b64_char(cast[int64]((combined / 64) % 64))
+        out = out + "="
+    }
+    return out
+}
+
+// Decode standard base64 text (with `=` padding) back to its byte buffer.
+// The input length must be a multiple of 4, `=` may only appear as trailing
+// padding in the final 4-character group, and every non-padding character
+// must be in the base64 alphabet; throws("...") otherwise.
+//
+// Security note: this function does not interpret or sanitize the decoded
+// bytes — if the input `str` is `@tainted`, the resulting `List[int32]`
+// carries the same taint forward (decoding is not a sanitizer). Callers that
+// need trusted bytes must sanitize/validate downstream, not rely on
+// base64_decode to have done it.
+pub func base64_decode(str s) -> List[int32] {
+    int64 n = s.len()
+    if (n % 4 != 0) {
+        throw("base64_decode: length must be a multiple of 4")
+    }
+    List[int32] out = list_new()
+    int64 i = 0
+    while (i < n) {
+        bool last_group = (i + 4 == n)
+        int32 c0 = s.byte_at(i)
+        int32 c1 = s.byte_at(i + 1)
+        int32 c2 = s.byte_at(i + 2)
+        int32 c3 = s.byte_at(i + 3)
+
+        if (c0 == '=' || c1 == '=') {
+            throw("base64_decode: invalid padding")
+        }
+        if (c2 == '=' && !last_group) {
+            throw("base64_decode: invalid padding")
+        }
+        if (c3 == '=' && !last_group) {
+            throw("base64_decode: invalid padding")
+        }
+        if (c2 == '=' && c3 != '=') {
+            throw("base64_decode: invalid padding")
+        }
+
+        int32 v0 = b64_value(c0)
+        int32 v1 = b64_value(c1)
+        int32 v2 = 0
+        int32 v3 = 0
+        bool has2 = false
+        bool has3 = false
+        if (c2 != '=') {
+            v2 = b64_value(c2)
+            has2 = true
+        }
+        if (c3 != '=') {
+            v3 = b64_value(c3)
+            has3 = true
+        }
+        // Throw HERE (this frame owns `out`) so the unwind releases it.
+        if (v0 < 0 || v1 < 0 || v2 < 0 || v3 < 0) {
+            throw("base64_decode: invalid character")
+        }
+
+        int32 combined = v0 * 262144 + v1 * 4096 + v2 * 64 + v3
+        out.push((combined / 65536) % 256)
+        if (has2) {
+            out.push((combined / 256) % 256)
+        }
+        if (has3) {
+            out.push(combined % 256)
+        }
+        i = i + 4
+    }
+    return out
+}

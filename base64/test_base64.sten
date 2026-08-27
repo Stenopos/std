@@ -1,0 +1,92 @@
+module std.base64.tests
+
+import std.base64.{base64_encode, base64_decode}
+
+func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   {name}")
+        return 0
+    }
+    println("  FAIL {name}")
+    return 1
+}
+
+func expect_str(str got, str want, str name) -> int32 {
+    if (got == want) {
+        return expect(true, name)
+    }
+    println("  FAIL {name}: got '{got}', want '{want}'")
+    return 1
+}
+
+func bytes_of(str s) -> List[int32] {
+    List[int32] b = list_new()
+    int64 i = 0
+    int64 n = s.len()
+    while (i < n) {
+        b.push(s.byte_at(i))
+        i = i + 1
+    }
+    return b
+}
+
+func bytes_eq(List[int32] a, List[int32] b) -> bool {
+    if (a.len() != b.len()) {
+        return false
+    }
+    int64 i = 0
+    while (i < a.len()) {
+        if (a.get(i) != b.get(i)) {
+            return false
+        }
+        i = i + 1
+    }
+    return true
+}
+
+func test_known_vectors() -> int32 {
+    int32 fails = 0
+    // The RFC 4648 padding examples.
+    fails += expect_str(base64_encode(bytes_of("Man")), "TWFu", "encode 'Man' (no padding)")
+    fails += expect_str(base64_encode(bytes_of("Ma")), "TWE=", "encode 'Ma' (one pad)")
+    fails += expect_str(base64_encode(bytes_of("M")), "TQ==", "encode 'M' (two pad)")
+    fails += expect_str(base64_encode(bytes_of("")), "", "encode empty")
+    fails += expect_str(base64_encode(bytes_of("foobar")), "Zm9vYmFy", "encode 'foobar'")
+    return fails
+}
+
+func test_round_trip() -> int32 {
+    int32 fails = 0
+    fails += expect(bytes_eq(base64_decode(base64_encode(bytes_of(""))), bytes_of("")), "round trip empty")
+    fails += expect(bytes_eq(base64_decode(base64_encode(bytes_of("f"))), bytes_of("f")), "round trip 1 byte")
+    fails += expect(bytes_eq(base64_decode(base64_encode(bytes_of("fo"))), bytes_of("fo")), "round trip 2 bytes")
+    fails += expect(bytes_eq(base64_decode(base64_encode(bytes_of("foo"))), bytes_of("foo")), "round trip 3 bytes")
+    fails += expect(bytes_eq(base64_decode("TWFu"), bytes_of("Man")), "decode 'TWFu' = Man")
+    fails += expect(bytes_eq(base64_decode("Zm9vYmFy"), bytes_of("foobar")), "decode 'Zm9vYmFy' = foobar")
+    return fails
+}
+
+func test_invalid() -> int32 {
+    int32 fails = 0
+    int32 caught = 0
+    try {
+        List[int32] bad = base64_decode("!!!!")
+        println("  unreachable {bad.len()}")
+    } catch (Error e) {
+        caught = 1
+    }
+    fails += expect(caught == 1, "decode invalid character throws")
+    return fails
+}
+
+func main() -> void {
+    int32 fails = 0
+    println("std.base64 tests:")
+    fails += test_known_vectors()
+    fails += test_round_trip()
+    fails += test_invalid()
+    if (fails > 0) {
+        fail("FAIL: {fails} check(s) failed")
+    }
+    println("PASS: all std.base64 checks passed")
+}
