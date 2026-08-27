@@ -19,6 +19,15 @@ func copy_i32(List[int32] xs) -> List[int32] {
     return out
 }
 
+// A fresh copy of an int64 list.
+func copy_i64(List[int64] xs) -> List[int64] {
+    List[int64] out = list_new()
+    for (v in xs) {
+        out.push(v)
+    }
+    return out
+}
+
 // A fresh copy of a str list.
 func copy_str(List[str] xs) -> List[str] {
     List[str] out = list_new()
@@ -66,9 +75,23 @@ pub func sort_i32(List[int32] xs) -> List[int32] {
     return a
 }
 
-// NOTE: sort_i64 is intentionally omitted for now — an int64-list-sort codegen
-// bug in the self-host (a `key = a.get(i)` element read miscompares in the
-// insertion loop) is on the int64 follow-up list. int32/str sorting is unaffected.
+// A new list with `xs`'s int64 elements in ascending order.
+pub func sort_i64(List[int64] xs) -> List[int64] {
+    List[int64] a = copy_i64(xs)
+    int64 n = a.len()
+    int64 i = 1
+    while (i < n) {
+        int64 key = a.get(i)
+        int64 j = i - 1
+        while (j >= 0 && a.get(j) > key) {
+            a.set(j + 1, a.get(j))
+            j -= 1
+        }
+        a.set(j + 1, key)
+        i += 1
+    }
+    return a
+}
 
 // A new list with `xs`'s str elements in ascending lexicographic order.
 pub func sort_str(List[str] xs) -> List[str] {

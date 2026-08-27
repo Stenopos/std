@@ -1,6 +1,6 @@
 module std.sort.tests
 
-import std.sort.{sort_i32, sort_str, binary_search_i32, is_sorted_i32, is_sorted_str}
+import std.sort.{sort_i32, sort_i64, sort_str, binary_search_i32, is_sorted_i32, is_sorted_str}
 
 func expect(bool cond, str name) -> int32 {
     if (cond) {
@@ -41,6 +41,18 @@ func test_sort_i32() -> int32 {
     return fails
 }
 
+func test_sort_i64() -> int32 {
+    int32 fails = 0
+    List[int64] xs = list_new()
+    xs.push(9000000000)
+    xs.push(1)
+    xs.push(5000000000)
+    List[int64] out = sort_i64(xs)
+    fails += expect(out.get(0) == 1 && out.get(1) == 5000000000 && out.get(2) == 9000000000, "sort_i64 sorts beyond int32 range")
+    fails += expect(xs.get(0) == 9000000000, "sort_i64 leaves argument unchanged")
+    return fails
+}
+
 func test_sort_str() -> int32 {
     int32 fails = 0
     List[str] xs = list_new()
@@ -68,6 +80,7 @@ func main() -> void {
     int32 fails = 0
     println("std.sort tests:")
     fails += test_sort_i32()
+    fails += test_sort_i64()
     fails += test_sort_str()
     fails += test_binary_search()
     if (fails > 0) {
