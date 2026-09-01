@@ -1,0 +1,355 @@
+// Stenopos standard library — json module
+// A JSON value tree, parser, and serializer. Pure Stenopos, no FFI.
+//
+// A JSON value is a payload enum:
+//   JNull                 — null
+//   JBool(bool)           — true / false
+//   JNum(int64)           — a number (INTEGERS only; JSON floats are not
+//                           supported yet — the subset has no float parser)
+//   JStr(str)             — a string
+//   JArr(List[Json])      — an array
+//   JObj(List[Json])      — an object, stored as a flat list of alternating
+//                           key (JStr) and value entries (k0,v0,k1,v1,...)
+//
+// Security note: parsed strings and numbers come from untrusted input — treat a
+// `parse` result as `@tainted`. Parsing is not validation; check values before
+// use.
+
+module std.json
+
+pub enum Json : int32 {
+    JNull
+    JBool(bool)
+    JNum(int64)
+    JStr(str)
+    JArr(List[Json])
+    JObj(List[Json])
+}
+
+// ---------------------------------------------------------------------------
+// Constructors (convenience — value semantics, each returns a fresh value)
+// ---------------------------------------------------------------------------
+
+pub func json_null() -> Json {
+    return Json.JNull
+}
+pub func json_bool(bool b) -> Json {
+    return Json.JBool(b)
+}
+pub func json_num(int64 n) -> Json {
+    return Json.JNum(n)
+}
+pub func json_str(str s) -> Json {
+    return Json.JStr(s)
+}
+
+// ---------------------------------------------------------------------------
+// Serialization
+// ---------------------------------------------------------------------------
+
+// Escape a string's special characters for JSON output.
+func escape(str s) -> str {
+    List[str] parts = list_new()
+    parts.push("\"")
+    int64 n = s.len()
+    int64 i = 0
+    while (i < n) {
+        int32 c = s.byte_at(i)
+        if (c == 34) {
+            parts.push("\\\"")
+        } else if (c == 92) {
+            parts.push("\\\\")
+        } else if (c == 10) {
+            parts.push("\\n")
+        } else if (c == 9) {
+            parts.push("\\t")
+        } else if (c == 13) {
+            parts.push("\\r")
+        } else {
+            parts.push(s.substring(i, i + 1))
+        }
+        i += 1
+    }
+    parts.push("\"")
+    return parts.join()
+}
+
+// "true"/"false". A match-bound bool payload is currently delivered as an int
+// (0/1) by both compilers, so this takes the int form and formats it.
+func bool_text(int32 b) -> str {
+    if (b == 0) {
+        return "false"
+    }
+    return "true"
+}
+
+// Render `v` as compact JSON text.
+pub func serialize(Json v) -> str {
+    match (v) {
+        case Json.JNull: return "null"
+        case Json.JBool(b): return bool_text(b)
+        case Json.JNum(n): return "{n}"
+        case Json.JStr(s): return escape(s)
+        case Json.JArr(items): return serialize_arr(items)
+        case Json.JObj(entries): return serialize_obj(entries)
+    }
+    return "null"
+}
+
+func serialize_arr(List[Json] items) -> str {
+    List[str] parts = list_new()
+    parts.push("[")
+    int64 n = items.len()
+    int64 i = 0
+    while (i < n) {
+        if (i > 0) {
+            parts.push(",")
+        }
+        parts.push(serialize(items.get(i)))
+        i += 1
+    }
+    parts.push("]")
+    return parts.join()
+}
+
+func serialize_obj(List[Json] entries) -> str {
+    List[str] parts = list_new()
+    parts.push("\{")
+    int64 n = entries.len()
+    int64 i = 0
+    while (i < n) {
+        if (i > 0) {
+            parts.push(",")
+        }
+        parts.push(serialize(entries.get(i)))       // key (a JStr)
+        parts.push(":")
+        parts.push(serialize(entries.get(i + 1)))   // value
+        i += 2
+    }
+    parts.push("\}")
+    return parts.join()
+}
+
+// ---------------------------------------------------------------------------
+// Parsing (recursive descent). The cursor is a 1-element List[int32] passed as
+// an argument — a List is a value, but a 1-cell list threaded through the parse
+// and read/written via get/set carries the position without globals.
+// ---------------------------------------------------------------------------
+
+func peek(str s, List[int32] pos) -> int32 {
+    int32 p = pos.get(0)
+    if (cast[int64](p) >= s.len()) {
+        return 0 - 1
+    }
+    return s.byte_at(cast[int64](p))
+}
+
+func advance(List[int32] pos) -> void {
+    pos.set(0, pos.get(0) + 1)
+}
+
+func skip_ws(str s, List[int32] pos) -> void {
+    bool go = true
+    while (go) {
+        int32 c = peek(s, pos)
+        if (c == 32 || c == 9 || c == 10 || c == 13) {
+            advance(pos)
+        } else {
+            go = false
+        }
+    }
+}
+
+// Parse a JSON document. Throws on malformed input.
+pub func parse(str s) -> Json {
+    List[int32] pos = list_new()
+    pos.push(0)
+    skip_ws(s, pos)
+    Json v = parse_value(s, pos)
+    skip_ws(s, pos)
+    if (cast[int64](pos.get(0)) != s.len()) {
+        throw("json.parse: trailing characters after the value")
+    }
+    return v
+}
+
+func parse_value(str s, List[int32] pos) -> Json {
+    skip_ws(s, pos)
+    int32 c = peek(s, pos)
+    if (c == 123) {          // '{'
+        return parse_object(s, pos)
+    }
+    if (c == 91) {           // '['
+        return parse_array(s, pos)
+    }
+    if (c == 34) {           // '"'
+        return Json.JStr(parse_string(s, pos))
+    }
+    if (c == 116 || c == 102) {   // 't' / 'f'
+        return parse_bool(s, pos)
+    }
+    if (c == 110) {          // 'n'
+        return parse_null(s, pos)
+    }
+    if (c == 45 || (c >= 48 && c <= 57)) {   // '-' or digit
+        return parse_number(s, pos)
+    }
+    throw("json.parse: unexpected character")
+}
+
+func expect_char(str s, List[int32] pos, int32 want, str name) -> void {
+    if (peek(s, pos) != want) {
+        throw("json.parse: expected {name}")
+    }
+    advance(pos)
+}
+
+func parse_string(str s, List[int32] pos) -> str {
+    expect_char(s, pos, 34, "opening quote")
+    List[str] parts = list_new()
+    bool go = true
+    while (go) {
+        int32 c = peek(s, pos)
+        if (c == 0 - 1) {
+            throw("json.parse: unterminated string")
+        }
+        if (c == 34) {                 // closing '"'
+            advance(pos)
+            go = false
+        } else if (c == 92) {          // backslash escape
+            advance(pos)
+            int32 e = peek(s, pos)
+            advance(pos)
+            if (e == 110) {
+                parts.push("\n")
+            } else if (e == 116) {
+                parts.push("\t")
+            } else if (e == 114) {
+                parts.push("\r")
+            } else if (e == 34) {
+                parts.push("\"")
+            } else if (e == 92) {
+                parts.push("\\")
+            } else if (e == 47) {
+                parts.push("/")
+            } else {
+                throw("json.parse: invalid escape")
+            }
+        } else {
+            int32 p = pos.get(0)
+            parts.push(s.substring(cast[int64](p), cast[int64](p) + 1))
+            advance(pos)
+        }
+    }
+    return parts.join()
+}
+
+func parse_number(str s, List[int32] pos) -> Json {
+    bool neg = false
+    if (peek(s, pos) == 45) {          // '-'
+        neg = true
+        advance(pos)
+    }
+    int64 val = 0
+    bool any = false
+    bool go = true
+    while (go) {
+        int32 c = peek(s, pos)
+        if (c >= 48 && c <= 57) {
+            val = val * 10 + cast[int64](c - 48)
+            any = true
+            advance(pos)
+        } else if (c == 46 || c == 101 || c == 69) {
+            // '.', 'e', 'E' — JSON floats/exponents are not supported yet.
+            throw("json.parse: non-integer numbers are not supported yet")
+        } else {
+            go = false
+        }
+    }
+    if (!any) {
+        throw("json.parse: malformed number")
+    }
+    if (neg) {
+        val = 0 - val
+    }
+    return Json.JNum(val)
+}
+
+func parse_bool(str s, List[int32] pos) -> Json {
+    if (peek(s, pos) == 116) {         // 't'
+        expect_char(s, pos, 116, "true")
+        expect_char(s, pos, 114, "true")
+        expect_char(s, pos, 117, "true")
+        expect_char(s, pos, 101, "true")
+        return Json.JBool(true)
+    }
+    expect_char(s, pos, 102, "false")
+    expect_char(s, pos, 97, "false")
+    expect_char(s, pos, 108, "false")
+    expect_char(s, pos, 115, "false")
+    expect_char(s, pos, 101, "false")
+    return Json.JBool(false)
+}
+
+func parse_null(str s, List[int32] pos) -> Json {
+    expect_char(s, pos, 110, "null")
+    expect_char(s, pos, 117, "null")
+    expect_char(s, pos, 108, "null")
+    expect_char(s, pos, 108, "null")
+    return Json.JNull
+}
+
+func parse_array(str s, List[int32] pos) -> Json {
+    expect_char(s, pos, 91, "'['")
+    List[Json] items = list_new()
+    skip_ws(s, pos)
+    if (peek(s, pos) == 93) {          // empty ']'
+        advance(pos)
+        return Json.JArr(items)
+    }
+    bool go = true
+    while (go) {
+        items.push(parse_value(s, pos))
+        skip_ws(s, pos)
+        int32 c = peek(s, pos)
+        if (c == 44) {                 // ','
+            advance(pos)
+        } else if (c == 93) {          // ']'
+            advance(pos)
+            go = false
+        } else {
+            throw("json.parse: expected ',' or ']' in array")
+        }
+    }
+    return Json.JArr(items)
+}
+
+func parse_object(str s, List[int32] pos) -> Json {
+    expect_char(s, pos, 123, "'\{'")
+    List[Json] entries = list_new()
+    skip_ws(s, pos)
+    if (peek(s, pos) == 125) {         // empty '}'
+        advance(pos)
+        return Json.JObj(entries)
+    }
+    bool go = true
+    while (go) {
+        skip_ws(s, pos)
+        str key = parse_string(s, pos)
+        entries.push(Json.JStr(key))
+        skip_ws(s, pos)
+        expect_char(s, pos, 58, "':'")
+        entries.push(parse_value(s, pos))
+        skip_ws(s, pos)
+        int32 c = peek(s, pos)
+        if (c == 44) {                 // ','
+            advance(pos)
+        } else if (c == 125) {         // '}'
+            advance(pos)
+            go = false
+        } else {
+            throw("json.parse: expected ',' or '\}' in object")
+        }
+    }
+    return Json.JObj(entries)
+}

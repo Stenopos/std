@@ -1,0 +1,103 @@
+module std.json.tests
+
+import std.json.{Json, parse, serialize, json_num, json_str, json_bool, json_null}
+
+func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   {name}")
+        return 0
+    }
+    println("  FAIL {name}")
+    return 1
+}
+
+func expect_str(str got, str want, str name) -> int32 {
+    if (got == want) {
+        return expect(true, name)
+    }
+    println("  FAIL {name}: got '{got}', want '{want}'")
+    return 1
+}
+
+// Round-trip: parse then serialize should reproduce the (compact) input.
+func roundtrip(str input, str name) -> int32 {
+    return expect_str(serialize(parse(input)), input, name)
+}
+
+func test_scalars() -> int32 {
+    int32 fails = 0
+    fails += roundtrip("null", "null")
+    fails += roundtrip("true", "true")
+    fails += roundtrip("false", "false")
+    fails += roundtrip("42", "positive int")
+    fails += roundtrip("-7", "negative int")
+    fails += roundtrip("9000000000", "int64 beyond int32 range")
+    fails += roundtrip("\"hello\"", "string")
+    return fails
+}
+
+func test_containers() -> int32 {
+    int32 fails = 0
+    fails += roundtrip("[1,2,3]", "array of ints")
+    fails += roundtrip("[]", "empty array")
+    fails += roundtrip("[true,null,\"x\"]", "mixed array")
+    fails += roundtrip("[[1,2],[3,4]]", "nested arrays")
+    fails += roundtrip("\{\}", "empty object")
+    fails += roundtrip("\{\"a\":1,\"b\":2\}", "object")
+    fails += roundtrip("\{\"n\":\{\"x\":[1,2]\}\}", "nested object + array")
+    return fails
+}
+
+func test_whitespace_and_escape() -> int32 {
+    int32 fails = 0
+    // Whitespace is skipped; the serialized form is compact.
+    fails += expect_str(serialize(parse("  [ 1 , 2 ]  ")), "[1,2]", "whitespace skipped")
+    // Escapes round-trip.
+    fails += expect_str(serialize(parse("\"a\\nb\"")), "\"a\\nb\"", "newline escape")
+    return fails
+}
+
+func test_constructors() -> int32 {
+    int32 fails = 0
+    fails += expect_str(serialize(json_num(5)), "5", "json_num")
+    fails += expect_str(serialize(json_str("hi")), "\"hi\"", "json_str")
+    fails += expect_str(serialize(json_bool(true)), "true", "json_bool")
+    fails += expect_str(serialize(json_null()), "null", "json_null")
+    return fails
+}
+
+func test_errors() -> int32 {
+    int32 fails = 0
+    int32 caught = 0
+    try {
+        Json bad = parse("[1,2")
+        println("  unreachable {serialize(bad)}")
+    } catch (Error e) {
+        caught = 1
+    }
+    fails += expect(caught == 1, "unterminated array throws")
+
+    int32 caught2 = 0
+    try {
+        Json bad = parse("nul")
+        println("  unreachable")
+    } catch (Error e) {
+        caught2 = 1
+    }
+    fails += expect(caught2 == 1, "malformed literal throws")
+    return fails
+}
+
+func main() -> void {
+    int32 fails = 0
+    println("std.json tests:")
+    fails += test_scalars()
+    fails += test_containers()
+    fails += test_whitespace_and_escape()
+    fails += test_constructors()
+    fails += test_errors()
+    if (fails > 0) {
+        fail("FAIL: {fails} check(s) failed")
+    }
+    println("PASS: all std.json checks passed")
+}
