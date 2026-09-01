@@ -1,0 +1,104 @@
+module std.bytes.tests
+
+import std.bytes.{
+    bytes_new, append_byte, append_bytes, append_str,
+    append_u16_le, append_u16_be, append_u32_le, append_u32_be,
+    read_u16_le, read_u16_be, read_u32_le, read_u32_be,
+    from_str, to_str, is_text, bytes_eq, slice
+}
+
+func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   {name}")
+        return 0
+    }
+    println("  FAIL {name}")
+    return 1
+}
+
+func test_append_byte() -> int32 {
+    int32 fails = 0
+    List[int32] buf = bytes_new()
+    fails += expect(buf.len() == 0, "bytes_new starts empty")
+    buf = append_byte(buf, 65)
+    fails += expect(buf.get(0) == 65, "append_byte stores a plain byte")
+    buf = append_byte(buf, 300)
+    fails += expect(buf.get(1) == 44, "append_byte masks values above 255 (300 & 255 = 44)")
+    buf = append_byte(buf, -1)
+    fails += expect(buf.get(2) == 255, "append_byte masks negative values (-1 & 255 = 255)")
+    fails += expect(buf.len() == 3, "buffer grew by 3 appends")
+    return fails
+}
+
+func test_value_semantics() -> int32 {
+    int32 fails = 0
+    // append returns a NEW buffer; the original is untouched.
+    List[int32] a = append_byte(bytes_new(), 1)
+    List[int32] b = append_byte(a, 2)
+    fails += expect(a.len() == 1, "append does not mutate its argument (a stays length 1)")
+    fails += expect(b.len() == 2 && b.get(1) == 2, "the returned buffer has the appended byte")
+    return fails
+}
+
+func test_endianness() -> int32 {
+    int32 fails = 0
+    List[int32] le16 = append_u16_le(bytes_new(), 258)
+    fails += expect(le16.get(0) == 2 && le16.get(1) == 1, "append_u16_le(258) writes [2, 1]")
+    fails += expect(read_u16_le(le16, 0) == 258, "read_u16_le round-trips 258")
+
+    List[int32] be16 = append_u16_be(bytes_new(), 258)
+    fails += expect(be16.get(0) == 1 && be16.get(1) == 2, "append_u16_be(258) writes [1, 2]")
+    fails += expect(read_u16_be(be16, 0) == 258, "read_u16_be round-trips 258")
+
+    List[int32] le32 = append_u32_le(bytes_new(), 16909060)
+    fails += expect(le32.get(0) == 4 && le32.get(1) == 3 && le32.get(2) == 2 && le32.get(3) == 1, "append_u32_le(0x01020304) writes [4,3,2,1]")
+    fails += expect(read_u32_le(le32, 0) == 16909060, "read_u32_le round-trips 0x01020304")
+
+    List[int32] be32 = append_u32_be(bytes_new(), 16909060)
+    fails += expect(be32.get(0) == 1 && be32.get(1) == 2 && be32.get(2) == 3 && be32.get(3) == 4, "append_u32_be(0x01020304) writes [1,2,3,4]")
+    fails += expect(read_u32_be(be32, 0) == 16909060, "read_u32_be round-trips 0x01020304")
+    return fails
+}
+
+func test_str_conversion() -> int32 {
+    int32 fails = 0
+    List[int32] b = from_str("Hi!")
+    fails += expect(b.len() == 3 && b.get(0) == 72 && b.get(2) == 33, "from_str yields the string's bytes")
+    fails += expect(is_text(b), "is_text true for printable ASCII")
+    fails += expect(to_str(b) == "Hi!", "to_str round-trips from_str")
+    // append_str onto an existing buffer.
+    List[int32] c = append_str(from_str("ab"), "cd")
+    fails += expect(to_str(c) == "abcd", "append_str concatenates")
+    return fails
+}
+
+func test_compare_slice() -> int32 {
+    int32 fails = 0
+    List[int32] a = from_str("hello")
+    List[int32] b = from_str("hello")
+    List[int32] c = from_str("world")
+    fails += expect(bytes_eq(a, b), "bytes_eq true for equal buffers")
+    fails += expect(!bytes_eq(a, c), "bytes_eq false for different buffers")
+    List[int32] mid = slice(a, 1, 4)
+    fails += expect(to_str(mid) == "ell", "slice [1,4) of 'hello' is 'ell'")
+    List[int32] clamped = slice(a, 0 - 2, 100)
+    fails += expect(to_str(clamped) == "hello", "slice clamps out-of-range bounds")
+    // append_bytes joins two buffers.
+    List[int32] joined = append_bytes(from_str("foo"), from_str("bar"))
+    fails += expect(to_str(joined) == "foobar", "append_bytes concatenates two buffers")
+    return fails
+}
+
+func main() -> void {
+    int32 fails = 0
+    println("std.bytes tests:")
+    fails += test_append_byte()
+    fails += test_value_semantics()
+    fails += test_endianness()
+    fails += test_str_conversion()
+    fails += test_compare_slice()
+    if (fails > 0) {
+        fail("FAIL: {fails} check(s) failed")
+    }
+    println("PASS: all std.bytes checks passed")
+}
