@@ -74,13 +74,12 @@ func escape(str s) -> str {
     return parts.join()
 }
 
-// "true"/"false". A match-bound bool payload is currently delivered as an int
-// (0/1) by both compilers, so this takes the int form and formats it.
-func bool_text(int32 b) -> str {
-    if (b == 0) {
-        return "false"
+// "true"/"false" for a JSON boolean.
+func bool_text(bool b) -> str {
+    if (b) {
+        return "true"
     }
-    return "true"
+    return "false"
 }
 
 // Render `v` as compact JSON text.
