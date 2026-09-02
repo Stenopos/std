@@ -1,0 +1,68 @@
+// Stenopos standard library — net module
+// Blocking TCP sockets, over the compiler's networking builtins (tcp_listen /
+// tcp_accept / tcp_read / tcp_write / tcp_close / tcp_connect). Every function
+// that touches the network declares @cap(Network), so a program's use of the
+// network is visible in its capability set — and a caller must declare the same.
+//
+// The socket handles are thin value types wrapping a file descriptor. A negative
+// `fd` signals failure (mirroring the builtins); callers check `l.fd < 0` /
+// `c.fd < 0` rather than catching exceptions.
+
+module std.net
+
+// A listening socket, bound to a port and accepting connections.
+pub struct Listener {
+    pub int32 fd
+}
+
+// A live connection to a peer (server-side accepted, or client-side connected).
+pub struct Conn {
+    pub int32 fd
+}
+
+// Bind and listen on `port` (all interfaces). Check `.fd < 0` for failure.
+@cap(Network)
+pub func listen(int32 port) -> Listener {
+    Listener l = Listener { fd: tcp_listen(port) }
+    return l
+}
+
+// Accept the next incoming connection (blocks until one arrives). The returned
+// Conn's `.fd < 0` on error.
+@cap(Network)
+pub func accept(Listener l) -> Conn {
+    Conn c = Conn { fd: tcp_accept(l.fd) }
+    return c
+}
+
+// Connect to `host`:`port` as a client (host is a dotted-quad IPv4 or
+// "localhost"). Check `.fd < 0` for failure.
+@cap(Network)
+pub func connect(str host, int32 port) -> Conn {
+    Conn c = Conn { fd: tcp_connect(host, port) }
+    return c
+}
+
+// Read one chunk (up to 64 KiB) from the connection. Returns "" on EOF or error.
+@cap(Network)
+pub func recv(Conn c) -> str {
+    return tcp_read(c.fd)
+}
+
+// Write all of `data` to the connection. Returns the byte count, or -1.
+@cap(Network)
+pub func send(Conn c, str data) -> int32 {
+    return tcp_write(c.fd, data)
+}
+
+// Close a connection. Returns 0 on success.
+@cap(Network)
+pub func close(Conn c) -> int32 {
+    return tcp_close(c.fd)
+}
+
+// Stop listening (close the listening socket). Returns 0 on success.
+@cap(Network)
+pub func shutdown(Listener l) -> int32 {
+    return tcp_close(l.fd)
+}

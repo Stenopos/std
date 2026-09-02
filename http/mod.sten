@@ -1,0 +1,67 @@
+// Stenopos standard library — http module
+// A tiny HTTP/1.1 surface: parse a request line and build a response. Pure string
+// work over std.net's byte streams — no I/O of its own, so no capabilities. Good
+// enough for a real "hello world" web service; a fuller client/server (headers,
+// chunked bodies, keep-alive) layers on top as a blessed package.
+
+module std.http
+
+// The parts of an HTTP request line this module extracts: "GET /path HTTP/1.1".
+pub struct Request {
+    pub str method
+    pub str path
+}
+
+// Parse the request line (the first line) of a raw request. A malformed request
+// yields method "" and path "/", so callers can route without crashing.
+pub func parse_request(str raw) -> Request {
+    // The request line ends at the first CRLF (or LF, being lenient).
+    int64 nl = raw.index_of("\r\n")
+    if (nl < 0) {
+        nl = raw.index_of("\n")
+    }
+    str line = raw
+    if (nl >= 0) {
+        line = raw.substring(0, nl)
+    }
+    List[str] parts = line.split(" ")
+    str method = ""
+    str path = "/"
+    if (parts.len() >= 1) {
+        method = parts.get(0)
+    }
+    if (parts.len() >= 2) {
+        path = parts.get(1)
+    }
+    Request r = Request { method: method, path: path }
+    return r
+}
+
+// The reason phrase for a status code (the common ones).
+pub func reason(int32 status) -> str {
+    if (status == 200) {
+        return "OK"
+    }
+    if (status == 400) {
+        return "Bad Request"
+    }
+    if (status == 404) {
+        return "Not Found"
+    }
+    if (status == 500) {
+        return "Internal Server Error"
+    }
+    return "OK"
+}
+
+// Build a complete HTTP/1.1 response with a text/plain body and Connection:
+// close (one request per connection — the simple model std.net serves).
+pub func response(int32 status, str body) -> str {
+    int32 n = cast[int32](body.len())
+    str head = "HTTP/1.1 {status} " + reason(status) + "\r\n"
+    head = head + "Content-Type: text/plain\r\n"
+    head = head + "Content-Length: {n}\r\n"
+    head = head + "Connection: close\r\n"
+    head = head + "\r\n"
+    return head + body
+}
