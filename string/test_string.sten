@@ -48,7 +48,7 @@ func test_queries() -> int32 {
     fails += expect(starts_with("stenopos", "sten"), "starts_with hit")
     fails += expect(!starts_with("stenopos", "str"), "starts_with miss")
     fails += expect(starts_with("stenopos", ""), "starts_with empty prefix")
-    fails += expect(ends_with("stenopos", "rel"), "ends_with hit")
+    fails += expect(ends_with("stenopos", "opos"), "ends_with hit")
     fails += expect(!ends_with("stenopos", "sten"), "ends_with miss")
     fails += expect(ends_with("stenopos", ""), "ends_with empty suffix")
     fails += expect(index_of("abcabc", "bc") == 1, "index_of first hit")
