@@ -1,3 +1,19 @@
 *.o
 *.ll
 bin/
+
+# Build outputs
+target/
+build/
+dist/
+out/
+*.a
+*.so
+*.bc
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
