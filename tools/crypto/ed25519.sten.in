@@ -1,0 +1,411 @@
+// Stenopos standard library — Ed25519 signature verification (RFC 8032).
+// Pure Stenopos, no FFI. Byte buffers are List[int32] values 0..255.
+//
+// The structure follows TweetNaCl's verifier (16 limbs of 16 bits per field
+// element, extended twisted-Edwards coordinates), with RFC 8032's check that
+// the signature's S is below the group order L. Verification handles only
+// public data (keys, messages, signatures), so it is not constant-time.
+// The constants are derived from the curve (see std's tools): d, 2d, the base
+// point B = (x, 4/5) and sqrt(-1), each as 16 little-endian 16-bit limbs.
+
+module std.crypto.ed25519
+
+import std.crypto.sha512.{sha512}
+
+@TABLES@
+
+// --- field arithmetic mod p = 2^255 - 19 -----------------------------------
+
+func fe_zero() -> List[int64] {
+    List[int64] o = list_new()
+    int32 i = 0
+    while (i < 16) {
+        o.push(0)
+        i = i + 1
+    }
+    return o
+}
+
+func fe_one() -> List[int64] {
+    List[int64] o = fe_zero()
+    o.set(0, 1)
+    return o
+}
+
+// Propagate carries so every limb is back in 0..2^16; the carry out of the
+// top limb wraps to limb 0 times 38 (2^256 = 38 mod p).
+func fe_carry(List[int64] a) -> List[int64] {
+    List[int64] o = a
+    int64 i = 0
+    while (i < 16) {
+        int64 v = o.get(i) + 65536
+        int64 c = v >> 16
+        if (i < 15) {
+            o.set(i + 1, o.get(i + 1) + c - 1)
+        } else {
+            o.set(0, o.get(0) + 38 * (c - 1))
+        }
+        o.set(i, v - (c << 16))
+        i = i + 1
+    }
+    return o
+}
+
+func fe_add(List[int64] a, List[int64] b) -> List[int64] {
+    List[int64] o = list_new()
+    int64 i = 0
+    while (i < 16) {
+        o.push(a.get(i) + b.get(i))
+        i = i + 1
+    }
+    return o
+}
+
+func fe_sub(List[int64] a, List[int64] b) -> List[int64] {
+    List[int64] o = list_new()
+    int64 i = 0
+    while (i < 16) {
+        o.push(a.get(i) - b.get(i))
+        i = i + 1
+    }
+    return o
+}
+
+func fe_mul(List[int64] a, List[int64] b) -> List[int64] {
+    List[int64] t = list_new()
+    int32 k = 0
+    while (k < 31) {
+        t.push(0)
+        k = k + 1
+    }
+    int64 i = 0
+    while (i < 16) {
+        int64 ai = a.get(i)
+        int64 j = 0
+        while (j < 16) {
+            t.set(i + j, t.get(i + j) + ai * b.get(j))
+            j = j + 1
+        }
+        i = i + 1
+    }
+    List[int64] o = list_new()
+    i = 0
+    while (i < 15) {
+        o.push(t.get(i) + 38 * t.get(i + 16))
+        i = i + 1
+    }
+    o.push(t.get(15))
+    return fe_carry(fe_carry(o))
+}
+
+func fe_sq(List[int64] a) -> List[int64] {
+    return fe_mul(a, a)
+}
+
+// a^(p-2) = 1/a.
+func fe_invert(List[int64] a) -> List[int64] {
+    List[int64] c = a
+    int32 k = 253
+    while (k >= 0) {
+        c = fe_sq(c)
+        if (k != 2 && k != 4) {
+            c = fe_mul(c, a)
+        }
+        k = k - 1
+    }
+    return c
+}
+
+// a^((p-5)/8), used for square roots.
+func fe_pow2523(List[int64] a) -> List[int64] {
+    List[int64] c = a
+    int32 k = 250
+    while (k >= 0) {
+        c = fe_sq(c)
+        if (k != 1) {
+            c = fe_mul(c, a)
+        }
+        k = k - 1
+    }
+    return c
+}
+
+// The canonical 32-byte little-endian encoding (fully reduced mod p).
+func fe_pack(List[int64] n) -> List[int32] {
+    List[int64] t = fe_carry(fe_carry(fe_carry(n)))
+    int32 pass = 0
+    while (pass < 2) {
+        List[int64] m = fe_zero()
+        m.set(0, t.get(0) - 65517)                        // 0xffed
+        int64 i = 1
+        while (i < 15) {
+            m.set(i, t.get(i) - 65535 - ((m.get(i - 1) >> 16) & 1))
+            m.set(i - 1, m.get(i - 1) & 65535)
+            i = i + 1
+        }
+        m.set(15, t.get(15) - 32767 - ((m.get(14) >> 16) & 1))
+        int64 borrow = (m.get(15) >> 16) & 1
+        m.set(14, m.get(14) & 65535)
+        if (borrow == 0) {
+            t = m
+        }
+        pass = pass + 1
+    }
+    List[int32] out = list_new()
+    int64 i = 0
+    while (i < 16) {
+        out.push(cast[int32](t.get(i) & 255))
+        out.push(cast[int32](t.get(i) >> 8))
+        i = i + 1
+    }
+    return out
+}
+
+func fe_unpack(List[int32] b) -> List[int64] {
+    List[int64] o = list_new()
+    int64 i = 0
+    while (i < 16) {
+        o.push(cast[int64](b.get(2 * i)) + (cast[int64](b.get(2 * i + 1)) << 8))
+        i = i + 1
+    }
+    o.set(15, o.get(15) & 32767)
+    return o
+}
+
+func bytes_eq(List[int32] a, List[int32] b) -> bool {
+    if (a.len() != b.len()) {
+        return false
+    }
+    int64 i = 0
+    while (i < a.len()) {
+        if (a.get(i) != b.get(i)) {
+            return false
+        }
+        i = i + 1
+    }
+    return true
+}
+
+func fe_eq(List[int64] a, List[int64] b) -> bool {
+    return bytes_eq(fe_pack(a), fe_pack(b))
+}
+
+func fe_parity(List[int64] a) -> int32 {
+    return fe_pack(a).get(0) & 1
+}
+
+// --- points: (X, Y, Z, T) with x = X/Z, y = Y/Z, xy = T/Z -------------------
+// A point is a flat List[int64] of 64 limbs: X = 0..15, Y = 16..31, ...
+
+func pt_coord(List[int64] p, int64 k) -> List[int64] {
+    List[int64] o = list_new()
+    int64 i = 0
+    while (i < 16) {
+        o.push(p.get(k * 16 + i))
+        i = i + 1
+    }
+    return o
+}
+
+func pt_make(List[int64] x, List[int64] y, List[int64] z, List[int64] t) -> List[int64] {
+    List[int64] p = list_new()
+    for (v in x) {
+        p.push(v)
+    }
+    for (v in y) {
+        p.push(v)
+    }
+    for (v in z) {
+        p.push(v)
+    }
+    for (v in t) {
+        p.push(v)
+    }
+    return p
+}
+
+func pt_add(List[int64] p, List[int64] q) -> List[int64] {
+    List[int64] px = pt_coord(p, 0)
+    List[int64] py = pt_coord(p, 1)
+    List[int64] pz = pt_coord(p, 2)
+    List[int64] pt = pt_coord(p, 3)
+    List[int64] qx = pt_coord(q, 0)
+    List[int64] qy = pt_coord(q, 1)
+    List[int64] qz = pt_coord(q, 2)
+    List[int64] qt = pt_coord(q, 3)
+    List[int64] a = fe_mul(fe_sub(py, px), fe_sub(qy, qx))
+    List[int64] b = fe_mul(fe_add(px, py), fe_add(qx, qy))
+    List[int64] c = fe_mul(fe_mul(pt, qt), fe_d2())
+    List[int64] d = fe_mul(pz, qz)
+    d = fe_add(d, d)
+    List[int64] e = fe_sub(b, a)
+    List[int64] f = fe_sub(d, c)
+    List[int64] g = fe_add(d, c)
+    List[int64] h = fe_add(b, a)
+    return pt_make(fe_mul(e, f), fe_mul(h, g), fe_mul(g, f), fe_mul(e, h))
+}
+
+// The canonical 32-byte encoding: y, with x's parity in the top bit.
+func pt_pack(List[int64] p) -> List[int32] {
+    List[int64] zi = fe_invert(pt_coord(p, 2))
+    List[int64] tx = fe_mul(pt_coord(p, 0), zi)
+    List[int64] ty = fe_mul(pt_coord(p, 1), zi)
+    List[int32] r = fe_pack(ty)
+    r.set(31, r.get(31) ^ (fe_parity(tx) << 7))
+    return r
+}
+
+// [s]q for a 32-byte little-endian scalar s (public data: not constant-time).
+func pt_scalarmult(List[int64] q0, List[int32] s) -> List[int64] {
+    List[int64] p = pt_make(fe_zero(), fe_one(), fe_one(), fe_zero())
+    List[int64] q = q0
+    int32 i = 255
+    while (i >= 0) {
+        int32 bit = (s.get(cast[int64](i / 8)) >> (i & 7)) & 1
+        if (bit == 1) {
+            p = pt_add(p, q)
+            q = pt_add(q, q)
+        } else {
+            q = pt_add(q, p)
+            p = pt_add(p, p)
+        }
+        i = i - 1
+    }
+    return p
+}
+
+func pt_base() -> List[int64] {
+    return pt_make(fe_base_x(), fe_base_y(), fe_one(), fe_mul(fe_base_x(), fe_base_y()))
+}
+
+// Decode a public key as the NEGATED point -A (what the check needs), or an
+// empty list if the encoding is not a point on the curve.
+func pt_unpack_neg(List[int32] pk) -> List[int64] {
+    List[int64] r2 = fe_one()
+    List[int64] r1 = fe_unpack(pk)
+    List[int64] num = fe_sq(r1)
+    List[int64] den = fe_mul(num, fe_d())
+    num = fe_sub(num, r2)
+    den = fe_add(r2, den)
+    List[int64] den2 = fe_sq(den)
+    List[int64] den4 = fe_sq(den2)
+    List[int64] den6 = fe_mul(den4, den2)
+    List[int64] t = fe_mul(fe_mul(den6, num), den)
+    t = fe_pow2523(t)
+    t = fe_mul(fe_mul(fe_mul(t, num), den), den)
+    List[int64] r0 = fe_mul(t, den)
+    if (!fe_eq(fe_mul(fe_sq(r0), den), num)) {
+        r0 = fe_mul(r0, fe_sqrtm1())
+    }
+    if (!fe_eq(fe_mul(fe_sq(r0), den), num)) {
+        List[int64] none = list_new()
+        return none
+    }
+    if (fe_parity(r0) == (pk.get(31) >> 7)) {
+        r0 = fe_sub(fe_zero(), r0)
+    }
+    return pt_make(r0, r1, r2, fe_mul(r0, r1))
+}
+
+// --- scalars mod L ----------------------------------------------------------
+
+// A 64-byte little-endian number reduced mod L, as 32 bytes.
+func mod_l(List[int32] h) -> List[int32] {
+    List[int32] lb = order_l()
+    List[int64] x = list_new()
+    for (b in h) {
+        x.push(cast[int64](b))
+    }
+    int64 i = 63
+    while (i >= 32) {
+        int64 carry = 0
+        int64 j = i - 32
+        while (j < i - 12) {
+            int64 v = x.get(j) + carry - 16 * x.get(i) * cast[int64](lb.get(j - (i - 32)))
+            carry = (v + 128) >> 8
+            x.set(j, v - (carry << 8))
+            j = j + 1
+        }
+        x.set(j, x.get(j) + carry)
+        x.set(i, 0)
+        i = i - 1
+    }
+    int64 carry2 = 0
+    int64 j2 = 0
+    while (j2 < 32) {
+        int64 v2 = x.get(j2) + carry2 - (x.get(31) >> 4) * cast[int64](lb.get(j2))
+        carry2 = v2 >> 8
+        x.set(j2, v2 & 255)
+        j2 = j2 + 1
+    }
+    j2 = 0
+    while (j2 < 32) {
+        x.set(j2, x.get(j2) - carry2 * cast[int64](lb.get(j2)))
+        j2 = j2 + 1
+    }
+    List[int32] r = list_new()
+    int64 k = 0
+    while (k < 32) {
+        x.set(k + 1, x.get(k + 1) + (x.get(k) >> 8))
+        r.push(cast[int32](x.get(k) & 255))
+        k = k + 1
+    }
+    return r
+}
+
+// Is the 32-byte little-endian scalar below L? (RFC 8032 rejects S >= L.)
+func below_l(List[int32] s) -> bool {
+    List[int32] lb = order_l()
+    int64 i = 31
+    while (i >= 0) {
+        if (s.get(i) < lb.get(i)) {
+            return true
+        }
+        if (s.get(i) > lb.get(i)) {
+            return false
+        }
+        i = i - 1
+    }
+    return false
+}
+
+func slice_bytes(List[int32] b, int64 from, int64 to) -> List[int32] {
+    List[int32] o = list_new()
+    int64 i = from
+    while (i < to) {
+        o.push(b.get(i))
+        i = i + 1
+    }
+    return o
+}
+
+// Verify a 64-byte Ed25519 signature `sig` of `msg` by the 32-byte public key
+// `pk`. True only for a valid signature; any malformed input is false.
+pub func ed25519_verify(List[int32] pk, List[int32] msg, List[int32] sig) -> bool {
+    if (pk.len() != 32 || sig.len() != 64) {
+        return false
+    }
+    List[int32] rb = slice_bytes(sig, 0, 32)
+    List[int32] sb = slice_bytes(sig, 32, 64)
+    if (!below_l(sb)) {
+        return false
+    }
+    List[int64] neg_a = pt_unpack_neg(pk)
+    if (neg_a.len() == 0) {
+        return false
+    }
+    List[int32] hin = list_new()
+    for (b in rb) {
+        hin.push(b)
+    }
+    for (b in pk) {
+        hin.push(b)
+    }
+    for (b in msg) {
+        hin.push(b)
+    }
+    List[int32] k = mod_l(sha512(hin))
+    // [S]B - [k]A must encode to R.
+    List[int64] p = pt_add(pt_scalarmult(neg_a, k), pt_scalarmult(pt_base(), sb))
+    return bytes_eq(pt_pack(p), rb)
+}
