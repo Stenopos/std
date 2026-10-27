@@ -126,4 +126,4 @@ Each module lives in its own directory with a `mod.sten` entry point. See [CONTR
 
 ## Documentation
 
-Full API reference: [stenopos.github.io/reference/stdlib](https://stenopos.github.io/reference/stdlib/)
+Full API reference: [stenopos.github.io/reference/stdlib](https://stenopos.github.io/language/reference/stdlib/)
