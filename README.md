@@ -11,15 +11,25 @@ written in Stenopos itself.
 | `math` | abs/sign/min/max/clamp (generic), gcd/lcm, pow_int, floor/ceil/round, sqrt (Newton's method), pi/e/tau | **Implemented + tested** |
 | `list` | Generic `List[T]` helpers: first/last, contains/index_of/count, copy/concat/fill/reverse/take/drop | **Implemented + tested** |
 | `collections` | Typed List helpers: range, sum/min/max, count, concat, slice | **Implemented + tested** |
+| `sort` | Sorting and searching | **Implemented + tested** |
+| `algo` | Small algorithms over `List[int32]` | **Implemented + tested** |
 | `io` | read_lines / write_lines / append_file over the file built-ins | **Implemented + tested** |
-| `logging` | Leveled logging (TRACE..FATAL): format_record/format_tagged, level_from_name, free trace/debug/info/warn/error + fatal (stderr+abort), a console `Logger` and a file `FileLogger` (build log) with threshold filtering and component tags | **Implemented + tested** |
-| `testing` | A tiny unit-test framework: expect / expect_eq_* / report | **Implemented + tested** |
 | `os` | Process + argv helpers: run / run_ok / argc / arg_at / args / has_flag | **Implemented + tested** |
 | `convert` | Primitive ↔ string: int/int64/float/bool_to_str, parse_int, is_int | **Implemented + tested** |
-| `assert` | Runtime assertions built on `fail`: assert / assert_eq_* / unreachable | **Implemented + tested** |
+| `fmt` | Number and string formatting, radix conversion | **Implemented + tested** |
+| `bytes` | Byte buffers: building, little/big-endian reads and writes | **Implemented + tested** |
+| `hex`, `base64` | Encoding and decoding byte buffers | **Implemented + tested** |
+| `json` | A JSON value tree, parser and serializer | **Implemented + tested** |
+| `hash` | Non-cryptographic hashes: FNV-1a, djb2, CRC-32 | **Implemented + tested** |
 | `crypto.sha256`, `crypto.sha512` | SHA-256 and SHA-512 (FIPS 180-4) over byte buffers | **Implemented + tested** |
 | `crypto.ed25519` | Ed25519 signature verification (RFC 8032; rejects non-canonical S) | **Implemented + tested** |
 | `crypto.sshsig` | SSH signatures (`ssh-keygen -Y sign`) for ssh-ed25519 keys: namespace- and key-bound verification | **Implemented + tested** |
+| `random` | A seeded, deterministic pseudo-random number generator | **Implemented + tested** |
+| `logging` | Leveled logging (TRACE..FATAL) to the console or a file, with component tags | **Implemented + tested** |
+| `testing` | A tiny unit-test framework: expect / expect_eq_* / report | **Implemented + tested** |
+| `assert` | Runtime assertions built on `fail`: assert / assert_eq_* / unreachable | **Implemented + tested** |
+| `net` | Blocking TCP sockets over the networking built-ins | Implemented, **no tests yet** |
+| `http` | Parse an HTTP/1.1 request line, build a response | Implemented, **no tests yet** |
 | `kernel` | Linux kernel-module FFI bindings (printk, uaccess, chrdev, errno) | Designed |
 
 Every implemented module has a sibling test program (`<mod>/test_<mod>.sten`)
