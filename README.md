@@ -19,6 +19,7 @@ written in Stenopos itself.
 | `assert` | Runtime assertions built on `fail`: assert / assert_eq_* / unreachable | **Implemented + tested** |
 | `crypto.sha256`, `crypto.sha512` | SHA-256 and SHA-512 (FIPS 180-4) over byte buffers | **Implemented + tested** |
 | `crypto.ed25519` | Ed25519 signature verification (RFC 8032; rejects non-canonical S) | **Implemented + tested** |
+| `crypto.sshsig` | SSH signatures (`ssh-keygen -Y sign`) for ssh-ed25519 keys: namespace- and key-bound verification | **Implemented + tested** |
 | `kernel` | Linux kernel-module FFI bindings (printk, uaccess, chrdev, errno) | Designed |
 
 Every implemented module has a sibling test program (`<mod>/test_<mod>.sten`)

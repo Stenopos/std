@@ -1,0 +1,217 @@
+// Stenopos standard library — SSH signatures (OpenSSH PROTOCOL.sshsig).
+// Verifies the signatures `ssh-keygen -Y sign -n <namespace>` writes, for
+// ssh-ed25519 keys. Pure Stenopos, no FFI.
+//
+// A signature binds a message to a NAMESPACE (so a signature made for one
+// purpose can't be replayed for another) and to the signer's key. Verification
+// accepts only an exact match of both, and any malformed input is rejected —
+// it never aborts.
+
+module std.crypto.sshsig
+
+import std.base64.{base64_decode}
+import std.crypto.ed25519.{ed25519_verify}
+import std.crypto.sha256.{sha256}
+import std.crypto.sha512.{sha512}
+
+func bytes_of(str s) -> List[int32] {
+    List[int32] b = list_new()
+    int64 i = 0
+    while (i < s.len()) {
+        b.push(s.byte_at(i))
+        i = i + 1
+    }
+    return b
+}
+
+func same(List[int32] a, List[int32] b) -> bool {
+    if (a.len() != b.len()) {
+        return false
+    }
+    int64 i = 0
+    while (i < a.len()) {
+        if (a.get(i) != b.get(i)) {
+            return false
+        }
+        i = i + 1
+    }
+    return true
+}
+
+func slice(List[int32] b, int64 from, int64 to) -> List[int32] {
+    List[int32] o = list_new()
+    int64 i = from
+    while (i < to) {
+        o.push(b.get(i))
+        i = i + 1
+    }
+    return o
+}
+
+// The SSH wire `string` at `pos`: a big-endian uint32 length, then the bytes.
+// Returns the length, or -1 when the field runs past the end of `b`.
+func wire_len(List[int32] b, int64 pos) -> int64 {
+    if (pos < 0 || pos + 4 > b.len()) {
+        return 0 - 1
+    }
+    int64 n = (cast[int64](b.get(pos)) << 24) | (cast[int64](b.get(pos + 1)) << 16) | (cast[int64](b.get(pos + 2)) << 8) | cast[int64](b.get(pos + 3))
+    if (pos + 4 + n > b.len()) {
+        return 0 - 1
+    }
+    return n
+}
+
+// `data` as an SSH wire `string`.
+func wire_string(List[int32] data) -> List[int32] {
+    List[int32] o = list_new()
+    int64 n = data.len()
+    o.push(cast[int32]((n >> 24) & 255))
+    o.push(cast[int32]((n >> 16) & 255))
+    o.push(cast[int32]((n >> 8) & 255))
+    o.push(cast[int32](n & 255))
+    for (v in data) {
+        o.push(v)
+    }
+    return o
+}
+
+// The 32-byte key inside an ssh-ed25519 public-key blob, or empty if the blob
+// is not exactly `string "ssh-ed25519", string key[32]`.
+func ed25519_key_of(List[int32] blob) -> List[int32] {
+    List[int32] none = list_new()
+    int64 tn = wire_len(blob, 0)
+    if (tn < 0 || !same(slice(blob, 4, 4 + tn), bytes_of("ssh-ed25519"))) {
+        return none
+    }
+    int64 kpos = 4 + tn
+    int64 kn = wire_len(blob, kpos)
+    if (kn != 32 || kpos + 4 + kn != blob.len()) {
+        return none
+    }
+    return slice(blob, kpos + 4, kpos + 36)
+}
+
+// The public-key blob of an OpenSSH public key line ("ssh-ed25519 AAAA...
+// comment", as in a .pub file), or empty if the line is not one.
+pub func ssh_public_key_blob(str line) -> List[int32] {
+    List[int32] none = list_new()
+    List[str] parts = line.trim().split(" ")
+    if (parts.len() < 2 || parts.get(0) != "ssh-ed25519") {
+        return none
+    }
+    List[int32] blob = none
+    try {
+        blob = base64_decode(parts.get(1))
+    } catch (Error e) {
+        return none
+    }
+    if (ed25519_key_of(blob).len() != 32) {
+        return none
+    }
+    return blob
+}
+
+// The base64 body of an armored signature (between the BEGIN and END lines).
+func armor_body(str armored) -> str {
+    str body = ""
+    bool inside = false
+    for (line in armored.split("\n")) {
+        str l = line.trim()
+        if (l == "-----BEGIN SSH SIGNATURE-----") {
+            inside = true
+        } else if (l == "-----END SSH SIGNATURE-----") {
+            inside = false
+        } else if (inside) {
+            body = body + l
+        }
+    }
+    return body
+}
+
+// Verify an armored SSH signature (`ssh-keygen -Y sign` output) of `msg`:
+// signed in `namespace` by the key on the OpenSSH public key line
+// `allowed_key`. True only when the signature is valid, the namespace matches
+// exactly, and the signing key is exactly that key.
+pub func sshsig_verify(str armored, List[int32] msg, str namespace, str allowed_key) -> bool {
+    List[int32] want_blob = ssh_public_key_blob(allowed_key)
+    if (want_blob.len() == 0) {
+        return false
+    }
+    // The body is a local (not a call temporary): a temporary argument is not
+    // freed when base64_decode throws on malformed input.
+    str body = armor_body(armored)
+    List[int32] b = list_new()
+    try {
+        b = base64_decode(body)
+    } catch (Error e) {
+        return false
+    }
+    // byte[6] "SSHSIG", uint32 version (1)
+    if (b.len() < 10 || !same(slice(b, 0, 6), bytes_of("SSHSIG"))) {
+        return false
+    }
+    if (b.get(6) != 0 || b.get(7) != 0 || b.get(8) != 0 || b.get(9) != 1) {
+        return false
+    }
+    // string publickey, string namespace, string reserved, string hash_algorithm,
+    // string signature — and nothing after.
+    int64 pos = 10
+    List[int32] fields_start = list_new()
+    List[int32] fields_len = list_new()
+    int32 f = 0
+    while (f < 5) {
+        int64 n = wire_len(b, pos)
+        if (n < 0) {
+            return false
+        }
+        fields_start.push(cast[int32](pos + 4))
+        fields_len.push(cast[int32](n))
+        pos = pos + 4 + n
+        f = f + 1
+    }
+    if (pos != b.len()) {
+        return false
+    }
+    List[int32] pk_blob = slice(b, cast[int64](fields_start.get(0)), cast[int64](fields_start.get(0) + fields_len.get(0)))
+    List[int32] ns = slice(b, cast[int64](fields_start.get(1)), cast[int64](fields_start.get(1) + fields_len.get(1)))
+    List[int32] reserved = slice(b, cast[int64](fields_start.get(2)), cast[int64](fields_start.get(2) + fields_len.get(2)))
+    List[int32] hash_alg = slice(b, cast[int64](fields_start.get(3)), cast[int64](fields_start.get(3) + fields_len.get(3)))
+    List[int32] sig_blob = slice(b, cast[int64](fields_start.get(4)), cast[int64](fields_start.get(4) + fields_len.get(4)))
+    if (!same(pk_blob, want_blob) || !same(ns, bytes_of(namespace))) {
+        return false
+    }
+    List[int32] digest = list_new()
+    if (same(hash_alg, bytes_of("sha512"))) {
+        digest = sha512(msg)
+    } else if (same(hash_alg, bytes_of("sha256"))) {
+        digest = sha256(msg)
+    } else {
+        return false
+    }
+    // The signature blob: string "ssh-ed25519", string sig[64].
+    int64 tn = wire_len(sig_blob, 0)
+    if (tn < 0 || !same(slice(sig_blob, 4, 4 + tn), bytes_of("ssh-ed25519"))) {
+        return false
+    }
+    int64 sn = wire_len(sig_blob, 4 + tn)
+    if (sn != 64 || 8 + tn + sn != sig_blob.len()) {
+        return false
+    }
+    List[int32] sig = slice(sig_blob, 8 + tn, 8 + tn + 64)
+    // What was signed: "SSHSIG", string namespace, string reserved,
+    // string hash_algorithm, string H(message).
+    List[int32] signed = bytes_of("SSHSIG")
+    for (v in wire_string(ns)) {
+        signed.push(v)
+    }
+    for (v in wire_string(reserved)) {
+        signed.push(v)
+    }
+    for (v in wire_string(hash_alg)) {
+        signed.push(v)
+    }
+    for (v in wire_string(digest)) {
+        signed.push(v)
+    }
+    return ed25519_verify(ed25519_key_of(pk_blob), signed, sig)
+}

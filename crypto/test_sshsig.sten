@@ -1,0 +1,38 @@
+// Tests for std.crypto.sshsig, from real `ssh-keygen -Y sign` signatures
+// (OpenSSH, an independent implementation) and invalid cases derived from them.
+
+module std.crypto.sshsig_tests
+
+import std.crypto.sshsig.{sshsig_verify}
+import std.hex.{hex_decode}
+
+func check(str sig, str msg_hex, str ns, str key, bool want, str name) -> int32 {
+    bool got = sshsig_verify(sig, hex_decode(msg_hex), ns, key)
+    if (got == want) {
+        println("  ok   {name}")
+        return 0
+    }
+    println("  FAIL {name}: got {got}")
+    return 1
+}
+
+func main() -> void {
+    int32 fails = 0
+    println("std.crypto sshsig tests:")
+    fails += check("-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgocbIVxXnYm/tT7c8oRUDicOGxO\nmv+u5oiFzkHmznbAwAAAARc3Rlbm9wb3MtcmVnaXN0cnkAAAAAAAAABnNoYTUxMgAAAFMA\nAAALc3NoLWVkMjU1MTkAAABA2Wi63aZEH3YoA4grAbeLB/MuXgG3xotuqP3yqQXxvr/1Qe\nkXav/kfQ3zJjpKKwijnkfDRju/m7vOPpOzUFujDw==\n-----END SSH SIGNATURE-----\n", "726f6c65203d20226f6e6c696e65220a65787069726573203d2022323032372d31302d3237220a", "stenopos-registry", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKHGyFcV52Jv7U+3PKEVA4nDhsTpr/ruaIhc5B5s52wM registry-root", true, "valid (sha512)")
+    fails += check("-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgocbIVxXnYm/tT7c8oRUDicOGxO\nmv+u5oiFzkHmznbAwAAAARc3Rlbm9wb3MtcmVnaXN0cnkAAAAAAAAABnNoYTI1NgAAAFMA\nAAALc3NoLWVkMjU1MTkAAABAIt19PLsdLwLyLzgudZGYKcISaIaUyZpfWtf5d6qpijPU3P\nFz1SBsgr7HJapr5+54L6FDaglStX2CydGmgZCXBg==\n-----END SSH SIGNATURE-----\n", "726f6c65203d20226f6e6c696e65220a65787069726573203d2022323032372d31302d3237220a", "stenopos-registry", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKHGyFcV52Jv7U+3PKEVA4nDhsTpr/ruaIhc5B5s52wM registry-root", true, "valid (sha256)")
+    fails += check("-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgocbIVxXnYm/tT7c8oRUDicOGxO\nmv+u5oiFzkHmznbAwAAAARc3Rlbm9wb3MtcmVnaXN0cnkAAAAAAAAABnNoYTUxMgAAAFMA\nAAALc3NoLWVkMjU1MTkAAABA1feLRhjb+61SMvgeUvYoMLVfaMM8QBXqsauhCsOihEyZea\nOYMCRJegOB//jWRs1Vvik5O6X0h7BbRaPoUVxuCQ==\n-----END SSH SIGNATURE-----\n", "", "stenopos-registry", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKHGyFcV52Jv7U+3PKEVA4nDhsTpr/ruaIhc5B5s52wM registry-root", true, "valid, empty message")
+    fails += check("-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgocbIVxXnYm/tT7c8oRUDicOGxO\nmv+u5oiFzkHmznbAwAAAARc3Rlbm9wb3MtcmVnaXN0cnkAAAAAAAAABnNoYTUxMgAAAFMA\nAAALc3NoLWVkMjU1MTkAAABA2Wi63aZEH3YoA4grAbeLB/MuXgG3xotuqP3yqQXxvr/1Qe\nkXav/kfQ3zJjpKKwijnkfDRju/m7vOPpOzUFujDw==\n-----END SSH SIGNATURE-----\n", "726f6c65203d20226f6e6c696e65220a65787069726573203d2022323032372d31302d3237220a20", "stenopos-registry", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKHGyFcV52Jv7U+3PKEVA4nDhsTpr/ruaIhc5B5s52wM registry-root", false, "wrong message")
+    fails += check("-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgocbIVxXnYm/tT7c8oRUDicOGxO\nmv+u5oiFzkHmznbAwAAAAEZmlsZQAAAAAAAAAGc2hhNTEyAAAAUwAAAAtzc2gtZWQyNTUx\nOQAAAECWFZuZOE1+lv34uMxYfAxWa1bawtLrWCzgMrRdNR5BSJ0t7OdrPASdnIwzzjIQIB\nWrs7SWkjix/n2d4KedJv8O\n-----END SSH SIGNATURE-----\n", "726f6c65203d20226f6e6c696e65220a65787069726573203d2022323032372d31302d3237220a", "stenopos-registry", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKHGyFcV52Jv7U+3PKEVA4nDhsTpr/ruaIhc5B5s52wM registry-root", false, "signed in another namespace")
+    fails += check("-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgocbIVxXnYm/tT7c8oRUDicOGxO\nmv+u5oiFzkHmznbAwAAAARc3Rlbm9wb3MtcmVnaXN0cnkAAAAAAAAABnNoYTUxMgAAAFMA\nAAALc3NoLWVkMjU1MTkAAABA2Wi63aZEH3YoA4grAbeLB/MuXgG3xotuqP3yqQXxvr/1Qe\nkXav/kfQ3zJjpKKwijnkfDRju/m7vOPpOzUFujDw==\n-----END SSH SIGNATURE-----\n", "726f6c65203d20226f6e6c696e65220a65787069726573203d2022323032372d31302d3237220a", "file", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKHGyFcV52Jv7U+3PKEVA4nDhsTpr/ruaIhc5B5s52wM registry-root", false, "checked against another namespace")
+    fails += check("-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAg5zoihafUgb3IGDvcMDolcFyxYs\nA3YgQMFWkDAqjQcdkAAAARc3Rlbm9wb3MtcmVnaXN0cnkAAAAAAAAABnNoYTUxMgAAAFMA\nAAALc3NoLWVkMjU1MTkAAABAN+4dHYwSnz4crzkWvRGfOrV4Sr+W2QoVll40h98Px+rFWc\n80ohcROR5XubtsvMYNo6e5rGpWvWwlnqQwSNpsDQ==\n-----END SSH SIGNATURE-----\n", "726f6c65203d20226f6e6c696e65220a65787069726573203d2022323032372d31302d3237220a", "stenopos-registry", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKHGyFcV52Jv7U+3PKEVA4nDhsTpr/ruaIhc5B5s52wM registry-root", false, "signed by another key")
+    fails += check("-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgocbIVxXnYm/tT7c8oRUDicOGxO\nmv+u5oiFzkHmznbAwAAAARc3Rlbm9wb3MtcmVnaXN0cnkAAAAAAAAABnNoYTUxMgAAAFMA\nAAALc3NoLWVkMjU1MTkAAABA2Wi63aZEH3YoA4grAbeLB/MuXgG3xotuqP3yqQXxvr/1Qe\nkXav/kfQ3zJjpKKwijnkfDRju/m7vOPpOzUFujDw==\n-----END SSH SIGNATURE-----\n", "726f6c65203d20226f6e6c696e65220a65787069726573203d2022323032372d31302d3237220a", "stenopos-registry", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOc6IoWn1IG9yBg73DA6JXBcsWLAN2IEDBVpAwKo0HHZ someone-else", false, "checked against another key")
+    fails += check("-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgocbIVxXnYm/tT7c8oRUDicOGxO\nmv+u5oiFzkHmznbAwAAAARc3Rlbm9wb3MtcmVnaXN0cnkAAAAAAAAABnNoYTUxMgAAAFMA\nAAALc3NoLWAkMjU1MTkAAABA2Wi63aZEH3YoA4grAbeLB/MuXgG3xotuqP3yqQXxvr/1Qe\nkXav/kfQ3zJjpKKwijnkfDRju/m7vOPpOzUFujDw==\n-----END SSH SIGNATURE-----\n", "726f6c65203d20226f6e6c696e65220a65787069726573203d2022323032372d31302d3237220a", "stenopos-registry", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKHGyFcV52Jv7U+3PKEVA4nDhsTpr/ruaIhc5B5s52wM registry-root", false, "tampered signature")
+    fails += check("-----BEGIN SSH SIGNATURE-----\n!!!!\n-----END SSH SIGNATURE-----\n", "726f6c65203d20226f6e6c696e65220a65787069726573203d2022323032372d31302d3237220a", "stenopos-registry", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKHGyFcV52Jv7U+3PKEVA4nDhsTpr/ruaIhc5B5s52wM registry-root", false, "not base64")
+    fails += check("", "726f6c65203d20226f6e6c696e65220a65787069726573203d2022323032372d31302d3237220a", "stenopos-registry", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKHGyFcV52Jv7U+3PKEVA4nDhsTpr/ruaIhc5B5s52wM registry-root", false, "empty")
+    fails += check("-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgocbIVxXnYm/tT7c8oRUDicOGxO\nmv+u5oiFzkHmznbAwAAAARc3Rlbm9wb3MtcmVnaXN0cnkAAAAAAAAABnNoYTUxMgAAAFMA\nAAALc3NoLWVkMjU1MTkAAABA2Wi63aZEH3YoA4grAbeLB/MuXgG3xotuqP3yqQXxvr/1Qe\nkXav/kfQ3zJjpKKwijnkfDRju/m7vOPpOzUFujDw==\n-----END SSH SIGNATURE-----\n", "726f6c65203d20226f6e6c696e65220a65787069726573203d2022323032372d31302d3237220a", "stenopos-registry", "ssh-rsa AAAA", false, "bad allowed key")
+    if (fails > 0) {
+        fail("FAIL: {fails} check(s) failed")
+    }
+    println("PASS: all std.crypto sshsig checks passed")
+}
