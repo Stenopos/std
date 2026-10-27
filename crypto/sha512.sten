@@ -1,0 +1,226 @@
+// Stenopos standard library — SHA512 (FIPS 180-4).
+// Pure Stenopos, no FFI. A byte buffer is a List[int32] of values 0..255 (as in
+// std.bytes). The constants are the fractional parts of the cube roots (K) and
+// square roots (H0) of the first primes; tests check digests against FIPS 180
+// vectors. Not constant-time with respect to the message length, which is
+// public; the data itself only flows through fixed-time operations.
+
+module std.crypto.sha512
+
+func round_constants() -> List[uint64] {
+    List[uint64] t = list_new()
+    t.push(0x428a2f98_d728ae22)
+    t.push(0x71374491_23ef65cd)
+    t.push(0xb5c0fbcf_ec4d3b2f)
+    t.push(0xe9b5dba5_8189dbbc)
+    t.push(0x3956c25b_f348b538)
+    t.push(0x59f111f1_b605d019)
+    t.push(0x923f82a4_af194f9b)
+    t.push(0xab1c5ed5_da6d8118)
+    t.push(0xd807aa98_a3030242)
+    t.push(0x12835b01_45706fbe)
+    t.push(0x243185be_4ee4b28c)
+    t.push(0x550c7dc3_d5ffb4e2)
+    t.push(0x72be5d74_f27b896f)
+    t.push(0x80deb1fe_3b1696b1)
+    t.push(0x9bdc06a7_25c71235)
+    t.push(0xc19bf174_cf692694)
+    t.push(0xe49b69c1_9ef14ad2)
+    t.push(0xefbe4786_384f25e3)
+    t.push(0x0fc19dc6_8b8cd5b5)
+    t.push(0x240ca1cc_77ac9c65)
+    t.push(0x2de92c6f_592b0275)
+    t.push(0x4a7484aa_6ea6e483)
+    t.push(0x5cb0a9dc_bd41fbd4)
+    t.push(0x76f988da_831153b5)
+    t.push(0x983e5152_ee66dfab)
+    t.push(0xa831c66d_2db43210)
+    t.push(0xb00327c8_98fb213f)
+    t.push(0xbf597fc7_beef0ee4)
+    t.push(0xc6e00bf3_3da88fc2)
+    t.push(0xd5a79147_930aa725)
+    t.push(0x06ca6351_e003826f)
+    t.push(0x14292967_0a0e6e70)
+    t.push(0x27b70a85_46d22ffc)
+    t.push(0x2e1b2138_5c26c926)
+    t.push(0x4d2c6dfc_5ac42aed)
+    t.push(0x53380d13_9d95b3df)
+    t.push(0x650a7354_8baf63de)
+    t.push(0x766a0abb_3c77b2a8)
+    t.push(0x81c2c92e_47edaee6)
+    t.push(0x92722c85_1482353b)
+    t.push(0xa2bfe8a1_4cf10364)
+    t.push(0xa81a664b_bc423001)
+    t.push(0xc24b8b70_d0f89791)
+    t.push(0xc76c51a3_0654be30)
+    t.push(0xd192e819_d6ef5218)
+    t.push(0xd6990624_5565a910)
+    t.push(0xf40e3585_5771202a)
+    t.push(0x106aa070_32bbd1b8)
+    t.push(0x19a4c116_b8d2d0c8)
+    t.push(0x1e376c08_5141ab53)
+    t.push(0x2748774c_df8eeb99)
+    t.push(0x34b0bcb5_e19b48a8)
+    t.push(0x391c0cb3_c5c95a63)
+    t.push(0x4ed8aa4a_e3418acb)
+    t.push(0x5b9cca4f_7763e373)
+    t.push(0x682e6ff3_d6b2b8a3)
+    t.push(0x748f82ee_5defb2fc)
+    t.push(0x78a5636f_43172f60)
+    t.push(0x84c87814_a1f0ab72)
+    t.push(0x8cc70208_1a6439ec)
+    t.push(0x90befffa_23631e28)
+    t.push(0xa4506ceb_de82bde9)
+    t.push(0xbef9a3f7_b2c67915)
+    t.push(0xc67178f2_e372532b)
+    t.push(0xca273ece_ea26619c)
+    t.push(0xd186b8c7_21c0c207)
+    t.push(0xeada7dd6_cde0eb1e)
+    t.push(0xf57d4f7f_ee6ed178)
+    t.push(0x06f067aa_72176fba)
+    t.push(0x0a637dc5_a2c898a6)
+    t.push(0x113f9804_bef90dae)
+    t.push(0x1b710b35_131c471b)
+    t.push(0x28db77f5_23047d84)
+    t.push(0x32caab7b_40c72493)
+    t.push(0x3c9ebe0a_15c9bebc)
+    t.push(0x431d67c4_9c100d4c)
+    t.push(0x4cc5d4be_cb3e42b6)
+    t.push(0x597f299c_fc657e2a)
+    t.push(0x5fcb6fab_3ad6faec)
+    t.push(0x6c44198c_4a475817)
+    return t
+}
+
+func initial_hash() -> List[uint64] {
+    List[uint64] t = list_new()
+    t.push(0x6a09e667_f3bcc908)
+    t.push(0xbb67ae85_84caa73b)
+    t.push(0x3c6ef372_fe94f82b)
+    t.push(0xa54ff53a_5f1d36f1)
+    t.push(0x510e527f_ade682d1)
+    t.push(0x9b05688c_2b3e6c1f)
+    t.push(0x1f83d9ab_fb41bd6b)
+    t.push(0x5be0cd19_137e2179)
+    return t
+}
+
+func rotr(uint64 x, uint64 n) -> uint64 {
+    return (x >> n) | (x << (64 - n))
+}
+
+// The message padded to a whole number of 128-byte blocks: a 0x80 byte,
+// zeros, then the length in bits as a 128-bit big-endian integer.
+func pad(List[int32] msg) -> List[int32] {
+    List[int32] out = list_new()
+    for (b in msg) {
+        out.push(b & 255)
+    }
+    out.push(128)
+    while (out.len() % 128 != 112) {
+        out.push(0)
+    }
+    uint64 nbits = wrapping_mul(cast[uint64](msg.len()), 8)
+    int32 z = 0
+    while (z < 8) {
+        out.push(0)
+        z = z + 1
+    }
+    int32 sh = 56
+    while (sh >= 0) {
+        out.push(cast[int32]((nbits >> cast[uint64](sh)) & 255))
+        sh = sh - 8
+    }
+    return out
+}
+
+// Word `j` of the padded message, big-endian.
+func word_at(List[int32] p, int64 j) -> uint64 {
+    uint64 w = 0
+    int64 k = 0
+    while (k < 8) {
+        w = (w << 8) | cast[uint64](p.get(j * 8 + k))
+        k = k + 1
+    }
+    return w
+}
+
+// The SHA512 digest of `msg`: 16 bytes.
+pub func sha512(List[int32] msg) -> List[int32] {
+    List[uint64] kk = round_constants()
+    List[uint64] h = initial_hash()
+    List[int32] p = pad(msg)
+    int64 nblocks = p.len() / 128
+    int64 blk = 0
+    while (blk < nblocks) {
+        List[uint64] w = list_new()
+        int64 t = 0
+        while (t < 16) {
+            w.push(word_at(p, blk * 16 + t))
+            t = t + 1
+        }
+        while (t < 80) {
+            uint64 w15 = w.get(t - 15)
+            uint64 w2 = w.get(t - 2)
+            uint64 sg0 = rotr(w15, 1) ^ rotr(w15, 8) ^ (w15 >> 7)
+            uint64 sg1 = rotr(w2, 19) ^ rotr(w2, 61) ^ (w2 >> 6)
+            w.push(wrapping_add(wrapping_add(sg1, w.get(t - 7)), wrapping_add(sg0, w.get(t - 16))))
+            t = t + 1
+        }
+        uint64 a = h.get(0)
+        uint64 b = h.get(1)
+        uint64 c = h.get(2)
+        uint64 d = h.get(3)
+        uint64 e = h.get(4)
+        uint64 f = h.get(5)
+        uint64 g = h.get(6)
+        uint64 hh = h.get(7)
+        t = 0
+        while (t < 80) {
+            uint64 bs1 = rotr(e, 14) ^ rotr(e, 18) ^ rotr(e, 41)
+            uint64 ch = (e & f) ^ (~e & g)
+            uint64 t1 = wrapping_add(wrapping_add(wrapping_add(hh, bs1), wrapping_add(ch, kk.get(t))), w.get(t))
+            uint64 bs0 = rotr(a, 28) ^ rotr(a, 34) ^ rotr(a, 39)
+            uint64 maj = (a & b) ^ (a & c) ^ (b & c)
+            uint64 t2 = wrapping_add(bs0, maj)
+            hh = g
+            g = f
+            f = e
+            e = wrapping_add(d, t1)
+            d = c
+            c = b
+            b = a
+            a = wrapping_add(t1, t2)
+            t = t + 1
+        }
+        h.set(0, wrapping_add(h.get(0), a))
+        h.set(1, wrapping_add(h.get(1), b))
+        h.set(2, wrapping_add(h.get(2), c))
+        h.set(3, wrapping_add(h.get(3), d))
+        h.set(4, wrapping_add(h.get(4), e))
+        h.set(5, wrapping_add(h.get(5), f))
+        h.set(6, wrapping_add(h.get(6), g))
+        h.set(7, wrapping_add(h.get(7), hh))
+        blk = blk + 1
+    }
+    List[int32] out = list_new()
+    for (v in h) {
+        int32 sh = 56
+        while (sh >= 0) {
+            out.push(cast[int32]((v >> cast[uint64](sh)) & 255))
+            sh = sh - 8
+        }
+    }
+    return out
+}
+
+// The digest of a string's bytes.
+pub func sha512_str(str s) -> List[int32] {
+    List[int32] b = list_new()
+    int64 i = 0
+    while (i < s.len()) {
+        b.push(s.byte_at(i))
+        i = i + 1
+    }
+    return sha512(b)
+}

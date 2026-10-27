@@ -17,6 +17,8 @@ written in Stenopos itself.
 | `os` | Process + argv helpers: run / run_ok / argc / arg_at / args / has_flag | **Implemented + tested** |
 | `convert` | Primitive ↔ string: int/int64/float/bool_to_str, parse_int, is_int | **Implemented + tested** |
 | `assert` | Runtime assertions built on `fail`: assert / assert_eq_* / unreachable | **Implemented + tested** |
+| `crypto.sha256`, `crypto.sha512` | SHA-256 and SHA-512 (FIPS 180-4) over byte buffers | **Implemented + tested** |
+| `crypto.ed25519` | Ed25519 signature verification (RFC 8032; rejects non-canonical S) | **Implemented + tested** |
 | `kernel` | Linux kernel-module FFI bindings (printk, uaccess, chrdev, errno) | Designed |
 
 Every implemented module has a sibling test program (`<mod>/test_<mod>.sten`)

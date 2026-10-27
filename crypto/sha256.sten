@@ -1,0 +1,210 @@
+// Stenopos standard library — SHA256 (FIPS 180-4).
+// Pure Stenopos, no FFI. A byte buffer is a List[int32] of values 0..255 (as in
+// std.bytes). The constants are the fractional parts of the cube roots (K) and
+// square roots (H0) of the first primes; tests check digests against FIPS 180
+// vectors. Not constant-time with respect to the message length, which is
+// public; the data itself only flows through fixed-time operations.
+
+module std.crypto.sha256
+
+func round_constants() -> List[uint32] {
+    List[uint32] t = list_new()
+    t.push(0x428a2f98)
+    t.push(0x71374491)
+    t.push(0xb5c0fbcf)
+    t.push(0xe9b5dba5)
+    t.push(0x3956c25b)
+    t.push(0x59f111f1)
+    t.push(0x923f82a4)
+    t.push(0xab1c5ed5)
+    t.push(0xd807aa98)
+    t.push(0x12835b01)
+    t.push(0x243185be)
+    t.push(0x550c7dc3)
+    t.push(0x72be5d74)
+    t.push(0x80deb1fe)
+    t.push(0x9bdc06a7)
+    t.push(0xc19bf174)
+    t.push(0xe49b69c1)
+    t.push(0xefbe4786)
+    t.push(0x0fc19dc6)
+    t.push(0x240ca1cc)
+    t.push(0x2de92c6f)
+    t.push(0x4a7484aa)
+    t.push(0x5cb0a9dc)
+    t.push(0x76f988da)
+    t.push(0x983e5152)
+    t.push(0xa831c66d)
+    t.push(0xb00327c8)
+    t.push(0xbf597fc7)
+    t.push(0xc6e00bf3)
+    t.push(0xd5a79147)
+    t.push(0x06ca6351)
+    t.push(0x14292967)
+    t.push(0x27b70a85)
+    t.push(0x2e1b2138)
+    t.push(0x4d2c6dfc)
+    t.push(0x53380d13)
+    t.push(0x650a7354)
+    t.push(0x766a0abb)
+    t.push(0x81c2c92e)
+    t.push(0x92722c85)
+    t.push(0xa2bfe8a1)
+    t.push(0xa81a664b)
+    t.push(0xc24b8b70)
+    t.push(0xc76c51a3)
+    t.push(0xd192e819)
+    t.push(0xd6990624)
+    t.push(0xf40e3585)
+    t.push(0x106aa070)
+    t.push(0x19a4c116)
+    t.push(0x1e376c08)
+    t.push(0x2748774c)
+    t.push(0x34b0bcb5)
+    t.push(0x391c0cb3)
+    t.push(0x4ed8aa4a)
+    t.push(0x5b9cca4f)
+    t.push(0x682e6ff3)
+    t.push(0x748f82ee)
+    t.push(0x78a5636f)
+    t.push(0x84c87814)
+    t.push(0x8cc70208)
+    t.push(0x90befffa)
+    t.push(0xa4506ceb)
+    t.push(0xbef9a3f7)
+    t.push(0xc67178f2)
+    return t
+}
+
+func initial_hash() -> List[uint32] {
+    List[uint32] t = list_new()
+    t.push(0x6a09e667)
+    t.push(0xbb67ae85)
+    t.push(0x3c6ef372)
+    t.push(0xa54ff53a)
+    t.push(0x510e527f)
+    t.push(0x9b05688c)
+    t.push(0x1f83d9ab)
+    t.push(0x5be0cd19)
+    return t
+}
+
+func rotr(uint32 x, uint32 n) -> uint32 {
+    return (x >> n) | (x << (32 - n))
+}
+
+// The message padded to a whole number of 64-byte blocks: a 0x80 byte,
+// zeros, then the length in bits as a 64-bit big-endian integer.
+func pad(List[int32] msg) -> List[int32] {
+    List[int32] out = list_new()
+    for (b in msg) {
+        out.push(b & 255)
+    }
+    out.push(128)
+    while (out.len() % 64 != 56) {
+        out.push(0)
+    }
+    uint64 nbits = wrapping_mul(cast[uint64](msg.len()), 8)
+    int32 z = 0
+    while (z < 0) {
+        out.push(0)
+        z = z + 1
+    }
+    int32 sh = 56
+    while (sh >= 0) {
+        out.push(cast[int32]((nbits >> cast[uint64](sh)) & 255))
+        sh = sh - 8
+    }
+    return out
+}
+
+// Word `j` of the padded message, big-endian.
+func word_at(List[int32] p, int64 j) -> uint32 {
+    uint32 w = 0
+    int64 k = 0
+    while (k < 4) {
+        w = (w << 8) | cast[uint32](p.get(j * 4 + k))
+        k = k + 1
+    }
+    return w
+}
+
+// The SHA256 digest of `msg`: 8 bytes.
+pub func sha256(List[int32] msg) -> List[int32] {
+    List[uint32] kk = round_constants()
+    List[uint32] h = initial_hash()
+    List[int32] p = pad(msg)
+    int64 nblocks = p.len() / 64
+    int64 blk = 0
+    while (blk < nblocks) {
+        List[uint32] w = list_new()
+        int64 t = 0
+        while (t < 16) {
+            w.push(word_at(p, blk * 16 + t))
+            t = t + 1
+        }
+        while (t < 64) {
+            uint32 w15 = w.get(t - 15)
+            uint32 w2 = w.get(t - 2)
+            uint32 sg0 = rotr(w15, 7) ^ rotr(w15, 18) ^ (w15 >> 3)
+            uint32 sg1 = rotr(w2, 17) ^ rotr(w2, 19) ^ (w2 >> 10)
+            w.push(wrapping_add(wrapping_add(sg1, w.get(t - 7)), wrapping_add(sg0, w.get(t - 16))))
+            t = t + 1
+        }
+        uint32 a = h.get(0)
+        uint32 b = h.get(1)
+        uint32 c = h.get(2)
+        uint32 d = h.get(3)
+        uint32 e = h.get(4)
+        uint32 f = h.get(5)
+        uint32 g = h.get(6)
+        uint32 hh = h.get(7)
+        t = 0
+        while (t < 64) {
+            uint32 bs1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)
+            uint32 ch = (e & f) ^ (~e & g)
+            uint32 t1 = wrapping_add(wrapping_add(wrapping_add(hh, bs1), wrapping_add(ch, kk.get(t))), w.get(t))
+            uint32 bs0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)
+            uint32 maj = (a & b) ^ (a & c) ^ (b & c)
+            uint32 t2 = wrapping_add(bs0, maj)
+            hh = g
+            g = f
+            f = e
+            e = wrapping_add(d, t1)
+            d = c
+            c = b
+            b = a
+            a = wrapping_add(t1, t2)
+            t = t + 1
+        }
+        h.set(0, wrapping_add(h.get(0), a))
+        h.set(1, wrapping_add(h.get(1), b))
+        h.set(2, wrapping_add(h.get(2), c))
+        h.set(3, wrapping_add(h.get(3), d))
+        h.set(4, wrapping_add(h.get(4), e))
+        h.set(5, wrapping_add(h.get(5), f))
+        h.set(6, wrapping_add(h.get(6), g))
+        h.set(7, wrapping_add(h.get(7), hh))
+        blk = blk + 1
+    }
+    List[int32] out = list_new()
+    for (v in h) {
+        int32 sh = 24
+        while (sh >= 0) {
+            out.push(cast[int32]((v >> cast[uint32](sh)) & 255))
+            sh = sh - 8
+        }
+    }
+    return out
+}
+
+// The digest of a string's bytes.
+pub func sha256_str(str s) -> List[int32] {
+    List[int32] b = list_new()
+    int64 i = 0
+    while (i < s.len()) {
+        b.push(s.byte_at(i))
+        i = i + 1
+    }
+    return sha256(b)
+}
