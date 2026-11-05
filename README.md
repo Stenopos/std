@@ -20,6 +20,7 @@ written in Stenopos itself.
 | `bytes` | Byte buffers: building, little/big-endian reads and writes | **Implemented + tested** |
 | `hex`, `base64` | Encoding and decoding byte buffers | **Implemented + tested** |
 | `json` | A JSON value tree, parser and serializer | **Implemented + tested** |
+| `toml` | A TOML 1.0 reader for configuration (Tagma.toml, the registry index): a flat table of paths | **Implemented + tested** |
 | `hash` | Non-cryptographic hashes: FNV-1a, djb2, CRC-32 | **Implemented + tested** |
 | `crypto.sha256`, `crypto.sha512` | SHA-256 and SHA-512 (FIPS 180-4) over byte buffers | **Implemented + tested** |
 | `crypto.ed25519` | Ed25519 signature verification (RFC 8032; rejects non-canonical S) | **Implemented + tested** |

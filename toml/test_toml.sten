@@ -1,0 +1,164 @@
+module std.toml.tests
+
+import std.toml.{Toml, parse_toml, toml_key, TOML_STRING, TOML_INT, TOML_TABLE, TOML_ARRAY, TOML_TABLES}
+
+func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   {name}")
+        return 0
+    }
+    println("  FAIL {name}")
+    return 1
+}
+
+func expect_str(str got, str want, str name) -> int32 {
+    if (got == want) {
+        return expect(true, name)
+    }
+    println("  FAIL {name}: got '{got}', want '{want}'")
+    return 1
+}
+
+// The string at `path`, or "<none>".
+func str_at(Toml t, str path) -> str {
+    return t.get_str(path) ?? "<none>"
+}
+
+// The integer at `path`, or -1.
+func int_at(Toml t, str path) -> int64 {
+    return t.get_int(path) ?? -1
+}
+
+// The boolean at `path` as 1/0, or -1 when absent.
+func bool_at(Toml t, str path) -> int32 {
+    bool? b = t.get_bool(path)
+    if (b == null) {
+        return -1
+    }
+    if (b) {
+        return 1
+    }
+    return 0
+}
+
+// A document that must read without error.
+func ok_doc(str src, str name) -> Toml {
+    Toml t = parse_toml(src)
+    if (t.error != "") {
+        println("  FAIL {name}: unexpected error: {t.error}")
+    }
+    return t
+}
+
+// A document that must fail with an error containing `want`.
+func expect_error(str src, str want, str name) -> int32 {
+    Toml t = parse_toml(src)
+    if (t.error.index_of(want) >= 0) {
+        return expect(true, name)
+    }
+    println("  FAIL {name}: got error '{t.error}', want one containing '{want}'")
+    return 1
+}
+
+func test_scalars() -> int32 {
+    println("scalars")
+    Toml t = ok_doc("# a comment\nname = \"json\"   # trailing\nlit = 'C:\\path'\nn = -42\nbig = 9_223_372_036_854_775_807\nyes = true\nno = false\n", "scalars read")
+    int32 f = 0
+    f += expect_str(str_at(t, "name"), "json", "basic string")
+    f += expect_str(str_at(t, "lit"), "C:\\path", "literal string keeps backslashes")
+    f += expect(int_at(t, "n") == -42, "negative integer")
+    f += expect(int_at(t, "big") == 9223372036854775807, "largest int64, with separators")
+    f += expect(bool_at(t, "yes") == 1 && bool_at(t, "no") == 0, "booleans")
+    f += expect(str_at(t, "n") == "<none>", "an integer is not a string")
+    f += expect(int_at(t, "missing") == -1, "a missing key is null")
+    f += expect(t.kind("name") == TOML_STRING && t.kind("n") == TOML_INT, "kinds")
+    return f
+}
+
+func test_escapes() -> int32 {
+    println("escapes")
+    Toml t = ok_doc("s = \"a\\tb\\n\\\"q\\\"\\\\ \\u0041\"\n", "escapes read")
+    return expect_str(str_at(t, "s"), "a\tb\n\"q\"\\ A", "\\t \\n \\\" \\\\ \\u0041")
+}
+
+func test_tables() -> int32 {
+    println("tables")
+    Toml t = ok_doc("top = 1\n[package]\nname = \"x\"\n[package.meta]\nowner = \"o\"\n[dependencies]\njson = \{ package = \"stenopos/json\", version = \"1.2\", caps = [] \}\nutil = \{ path = \"../util\" \}\n", "tables read")
+    int32 f = 0
+    f += expect_str(str_at(t, "package.name"), "x", "a [table] key")
+    f += expect_str(str_at(t, "package.meta.owner"), "o", "a nested [a.b] table")
+    f += expect(t.kind("package") == TOML_TABLE, "a table's kind")
+    f += expect_str(str_at(t, "dependencies.json.package"), "stenopos/json", "an inline table")
+    f += expect(t.len("dependencies.json.caps") == 0, "an empty array")
+    List[str] deps = t.keys("dependencies")
+    f += expect(deps.len() == 2 && deps.get(0) == "json" && deps.get(1) == "util", "keys in order")
+    List[str] top = t.keys("")
+    f += expect(top.len() == 3 && top.get(0) == "top", "top-level keys")
+    return f
+}
+
+func test_dotted_and_quoted() -> int32 {
+    println("dotted and quoted keys")
+    Toml t = ok_doc("a.b.c = 1\n\"stenopos/json\" = \"1.2\"\n\"x.y\" = 2\n", "keys read")
+    int32 f = 0
+    f += expect(int_at(t, "a.b.c") == 1, "a dotted key makes tables")
+    f += expect(t.kind("a.b") == TOML_TABLE, "the implicit table")
+    f += expect_str(str_at(t, "stenopos/json"), "1.2", "a quoted key with '/' stays bare")
+    f += expect(int_at(t, toml_key("x.y")) == 2, "a quoted key with '.' is quoted in paths")
+    f += expect_str(toml_key("x.y"), "\"x.y\"", "toml_key quotes it")
+    return f
+}
+
+func test_arrays() -> int32 {
+    println("arrays")
+    Toml t = ok_doc("caps = [\n  \"File\",   # reads its input\n  \"Network\",\n]\nnums = [1, 2, 3]\nnested = [[1], [2, 3]]\n", "arrays read")
+    int32 f = 0
+    f += expect(t.len("caps") == 2, "a multi-line array with comments and a trailing comma")
+    f += expect_str(str_at(t, "caps[1]"), "Network", "an element")
+    f += expect(t.kind("caps") == TOML_ARRAY, "an array's kind")
+    f += expect(int_at(t, "nums[2]") == 3, "integers")
+    f += expect(t.len("nested[1]") == 2 && int_at(t, "nested[1][0]") == 2, "nested arrays")
+    return f
+}
+
+func test_array_of_tables() -> int32 {
+    println("arrays of tables")
+    Toml t = ok_doc("name = \"json\"\n[[version]]\nversion = \"1.0.0\"\n[version.deps]\nx = \"1\"\n[[version]]\nversion = \"1.1.0\"\nyanked = true\n", "array of tables read")
+    int32 f = 0
+    f += expect(t.kind("version") == TOML_TABLES && t.len("version") == 2, "two entries")
+    f += expect_str(str_at(t, "version[0].version"), "1.0.0", "the first entry")
+    f += expect_str(str_at(t, "version[0].deps.x"), "1", "a sub-table of the last entry")
+    f += expect(bool_at(t, "version[1].yanked") == 1, "the second entry")
+    return f
+}
+
+func test_errors() -> int32 {
+    println("errors")
+    int32 f = 0
+    f += expect_error("a = 1\na = 2\n", "line 2: `a` is defined twice", "a duplicate key")
+    f += expect_error("[t]\n[t]\n", "line 2: `t` is defined twice", "a table defined twice")
+    f += expect_error("a = 1\n[a]\n", "line 2: `a` is defined twice", "a table over a value")
+    f += expect_error("t = \{ x = 1 \}\n[t]\n", "defined twice", "a header over an inline table")
+    f += expect_error("x = 1.5\n", "floats are not supported", "a float")
+    f += expect_error("d = 2026-10-27\n", "dates and times are not supported", "a date")
+    f += expect_error("h = 0xff\n", "hexadecimal", "a hex integer")
+    f += expect_error("s = \"\"\"long\"\"\"\n", "multi-line strings", "a multi-line string")
+    f += expect_error("s = \"open\n", "line 1: the string is not closed", "an unclosed string")
+    f += expect_error("a = [1, 2\n", "the array is not closed", "an unclosed array")
+    f += expect_error("a = 1 b = 2\n", "expected the end of the line", "two pairs on a line")
+    f += expect_error("= 1\n", "expected a key", "no key")
+    f += expect_error("n = 9223372036854775808\n", "does not fit in 64 bits", "an integer overflow")
+    f += expect_error("s = \"\\u00e9\"\n", "printable ASCII only", "a non-ASCII \\u escape")
+    f += expect_error("a.b = 1\na.b.c = 2\n", "`a.b` is not a table", "a key under a value")
+    return f
+}
+
+func main() -> int32 {
+    int32 failed = test_scalars() + test_escapes() + test_tables() + test_dotted_and_quoted() + test_arrays() + test_array_of_tables() + test_errors()
+    if (failed == 0) {
+        println("PASS")
+        return 0
+    }
+    println("FAIL: {failed}")
+    return 1
+}

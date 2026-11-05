@@ -1,0 +1,708 @@
+// Stenopos standard library — toml module
+// A TOML 1.0 reader for configuration: Tagma.toml, Tagma.lock and the package
+// registry's index files.
+//
+// A document is read into a flat table of PATHS, one per key, table and
+// array element, in the order they appear:
+//
+//   [package]                 package              table
+//   name = "json"             package.name         string "json"
+//   tags = ["a", "b"]         package.tags         array (2 elements)
+//                             package.tags[0]      string "a"
+//   [[version]]               version              array of tables (1)
+//   v = "1.0.0"               version[0]           table
+//                             version[0].v         string "1.0.0"
+//
+// A key that contains `.`, `[`, `]` or `"` appears quoted in a path:
+// `deps."a.b"`. Look values up with get_str/get_int/get_bool, count an array
+// with len, and list a table's keys with keys.
+//
+// Supported: comments; bare, quoted and dotted keys; [tables] and
+// [[arrays of tables]]; basic and literal strings (one line); decimal
+// integers (with `_` separators); booleans; arrays (over several lines, with
+// comments and a trailing comma); inline tables. Not supported, and reported
+// as an error rather than misread: multi-line strings, floats, dates and
+// times, hexadecimal/octal/binary integers, and `\u` escapes above ASCII
+// (write the character itself).
+//
+// Every error names its line. Security: a parsed document is untrusted input.
+
+module std.toml
+
+pub const int32 TOML_STRING = 0
+pub const int32 TOML_INT = 1
+pub const int32 TOML_BOOL = 2
+pub const int32 TOML_TABLE = 3
+pub const int32 TOML_ARRAY = 4
+pub const int32 TOML_TABLES = 5          // an array of tables ([[name]])
+
+pub struct Toml {
+    pub List[str] paths
+    pub List[int32] kinds
+    // A string's text, an integer's digits, "true"/"false", or for an array
+    // its element count.
+    pub List[str] values
+    // How the table at the same index was made: 1 by a [header] or as an
+    // inline table (it can't be opened again), 0 implicitly by a longer key.
+    pub List[int32] closed
+    // "" when the document was read; otherwise "line N: what is wrong".
+    pub str error
+
+    // The index of `path`, or -1.
+    pub func find(str path) -> int32 {
+        int32 i = 0
+        int32 n = cast[int32](this.paths.len())
+        while (i < n) {
+            if (this.paths.get(i) == path) {
+                return i
+            }
+            i += 1
+        }
+        return -1
+    }
+
+    pub func has(str path) -> bool {
+        return this.find(path) >= 0
+    }
+
+    // The kind of the value at `path` (TOML_STRING, ...), or -1 if absent.
+    pub func kind(str path) -> int32 {
+        int32 i = this.find(path)
+        if (i < 0) {
+            return -1
+        }
+        return this.kinds.get(i)
+    }
+
+    // The string at `path`; null if absent or not a string.
+    pub func get_str(str path) -> str? {
+        int32 i = this.find(path)
+        if (i < 0 || this.kinds.get(i) != TOML_STRING) {
+            return null
+        }
+        return this.values.get(i)
+    }
+
+    // The integer at `path`; null if absent or not an integer.
+    pub func get_int(str path) -> int64? {
+        int32 i = this.find(path)
+        if (i < 0 || this.kinds.get(i) != TOML_INT) {
+            return null
+        }
+        return decimal_int64(this.values.get(i))
+    }
+
+    // The boolean at `path`; null if absent or not a boolean.
+    pub func get_bool(str path) -> bool? {
+        int32 i = this.find(path)
+        if (i < 0 || this.kinds.get(i) != TOML_BOOL) {
+            return null
+        }
+        return this.values.get(i) == "true"
+    }
+
+    // The number of elements of the array (or array of tables) at `path`;
+    // -1 if there is none.
+    pub func len(str path) -> int32 {
+        int32 i = this.find(path)
+        if (i < 0 || (this.kinds.get(i) != TOML_ARRAY && this.kinds.get(i) != TOML_TABLES)) {
+            return -1
+        }
+        int32? n = this.values.get(i).parse_int()
+        return n ?? -1
+    }
+
+    // The keys of the table at `path` ("" for the top level), in order, as
+    // they appear in paths (quoted when they need it).
+    pub func keys(str path) -> List[str] {
+        List[str] out = list_new()
+        str prefix = ""
+        if (path.len() > 0) {
+            prefix = path + "."
+        }
+        int32 i = 0
+        int32 n = cast[int32](this.paths.len())
+        while (i < n) {
+            str p = this.paths.get(i)
+            if (p.len() > prefix.len() && p.starts_with(prefix)) {
+                str rest = p.substring(prefix.len(), p.len())
+                if (segment_end(rest, 0) == rest.len()) {
+                    out.push(rest)
+                }
+            }
+            i += 1
+        }
+        return out
+    }
+}
+
+// The path segment for key `k`: quoted when it holds a character that has a
+// meaning in paths.
+pub func toml_key(str k) -> str {
+    int64 i = 0
+    bool plain = k.len() > 0
+    while (i < k.len()) {
+        int32 c = k.byte_at(i)
+        if (c == '.' || c == '[' || c == ']' || c == '"') {
+            plain = false
+        }
+        i += 1
+    }
+    if (plain) {
+        return k
+    }
+    str q = "\""
+    i = 0
+    while (i < k.len()) {
+        if (k.byte_at(i) == '"') {
+            q = q + "\\\""
+        } else {
+            q = q + k.substring(i, i + 1)
+        }
+        i += 1
+    }
+    return q + "\""
+}
+
+// The end of the path segment starting at `i` (a quoted key, or up to the
+// next `.` or `[`); an `[n]` index belongs to the segment before it.
+func segment_end(str p, int64 i) -> int64 {
+    int64 j = i
+    if (j < p.len() && p.byte_at(j) == '"') {
+        j += 1
+        while (j < p.len() && p.byte_at(j) != '"') {
+            if (p.byte_at(j) == '\\') {
+                j += 1
+            }
+            j += 1
+        }
+        j += 1
+    } else {
+        while (j < p.len() && p.byte_at(j) != '.' && p.byte_at(j) != '[') {
+            j += 1
+        }
+    }
+    while (j < p.len() && p.byte_at(j) == '[') {
+        while (j < p.len() && p.byte_at(j) != ']') {
+            j += 1
+        }
+        j += 1
+    }
+    return j
+}
+
+// The int64 written in decimal by `d` (an optional '-', then digits); null if
+// it is empty or does not fit. Accumulated as a negative number, so the
+// smallest int64 is readable too.
+func decimal_int64(str d) -> int64? {
+    bool neg = d.len() > 0 && d.byte_at(0) == '-'
+    int64 i = 0
+    if (neg) {
+        i = 1
+    }
+    if (i >= d.len()) {
+        return null
+    }
+    int64 smallest = -9223372036854775807 - 1
+    int64 v = 0
+    while (i < d.len()) {
+        int32 c = d.byte_at(i)
+        if (!is_digit(c)) {
+            return null
+        }
+        int64 digit = cast[int64](c - '0')
+        if (v < (smallest + digit) / 10) {
+            return null
+        }
+        v = v * 10 - digit
+        i += 1
+    }
+    if (neg) {
+        return v
+    }
+    if (v == smallest) {
+        return null
+    }
+    return 0 - v
+}
+
+func join_path(str a, str b) -> str {
+    if (a.len() == 0) {
+        return b
+    }
+    return a + "." + b
+}
+
+func is_bare_char(int32 c) -> bool {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-'
+}
+
+func is_digit(int32 c) -> bool {
+    return c >= '0' && c <= '9'
+}
+
+// The reader: a cursor over the source, building the document.
+struct Reader {
+    str s
+    int64 i
+    int32 line
+    Toml doc
+    str table                            // the current [table] path
+
+    func peek() -> int32 {
+        if (this.i < this.s.len()) {
+            return this.s.byte_at(this.i)
+        }
+        return -1
+    }
+
+    func at(int64 k) -> int32 {
+        if (this.i + k < this.s.len()) {
+            return this.s.byte_at(this.i + k)
+        }
+        return -1
+    }
+
+    // Record the first error only.
+    func fail_at(str msg) -> void {
+        if (this.doc.error.len() == 0) {
+            this.doc.error = "line {this.line}: " + msg
+        }
+    }
+
+    func failed() -> bool {
+        return this.doc.error.len() > 0
+    }
+
+    func add(str path, int32 kind, str value, int32 closed) -> void {
+        this.doc.paths.push(path)
+        this.doc.kinds.push(kind)
+        this.doc.values.push(value)
+        this.doc.closed.push(closed)
+    }
+
+    // Spaces and tabs.
+    func skip_blank() -> void {
+        while (this.peek() == ' ' || this.peek() == '\t') {
+            this.i += 1
+        }
+    }
+
+    // Blanks, comments and line breaks (inside arrays, and between lines).
+    func skip_all() -> void {
+        bool more = true
+        while (more) {
+            this.skip_blank()
+            int32 c = this.peek()
+            if (c == '#') {
+                while (this.peek() != '\n' && this.peek() != -1) {
+                    this.i += 1
+                }
+            } else if (c == '\n') {
+                this.i += 1
+                this.line += 1
+            } else if (c == '\r' && this.at(1) == '\n') {
+                this.i += 2
+                this.line += 1
+            } else {
+                more = false
+            }
+        }
+    }
+
+    // After a value or a header: blanks, an optional comment, then the end of
+    // the line or of the document.
+    func end_line() -> void {
+        this.skip_blank()
+        if (this.peek() == '#') {
+            while (this.peek() != '\n' && this.peek() != -1) {
+                this.i += 1
+            }
+        }
+        int32 c = this.peek()
+        if (c == '\r' && this.at(1) == '\n') {
+            this.i += 1
+            c = '\n'
+        }
+        if (c == '\n') {
+            this.i += 1
+            this.line += 1
+        } else if (c != -1) {
+            this.fail_at("expected the end of the line, found '" + this.s.substring(this.i, this.i + 1) + "'")
+        }
+    }
+
+    // One key: bare (letters, digits, `_`, `-`) or a quoted string.
+    func read_key() -> str {
+        this.skip_blank()
+        int32 c = this.peek()
+        if (c == '"' || c == '\'') {
+            return this.read_string()
+        }
+        int64 start = this.i
+        while (is_bare_char(this.peek())) {
+            this.i += 1
+        }
+        if (this.i == start) {
+            this.fail_at("expected a key")
+            return ""
+        }
+        return this.s.substring(start, this.i)
+    }
+
+    // A dotted key (`a.b."c"`), as path segments.
+    func read_dotted() -> List[str] {
+        List[str] segs = list_new()
+        segs.push(toml_key(this.read_key()))
+        this.skip_blank()
+        while (this.peek() == '.' && !this.failed()) {
+            this.i += 1
+            segs.push(toml_key(this.read_key()))
+            this.skip_blank()
+        }
+        return segs
+    }
+
+    // Walk `segs` from `base`, making missing tables implicitly; a segment that
+    // names an array of tables continues in its last element. Returns the
+    // path of the last segment's PARENT, or "" with an error set.
+    func walk(str base, List[str] segs, int32 upto) -> str {
+        str cur = base
+        int32 k = 0
+        while (k < upto) {
+            str p = join_path(cur, segs.get(k))
+            int32 idx = this.doc.find(p)
+            if (idx < 0) {
+                this.add(p, TOML_TABLE, "", 0)
+            } else {
+                int32 kd = this.doc.kinds.get(idx)
+                if (kd == TOML_TABLES) {
+                    int32? n = this.doc.values.get(idx).parse_int()
+                    p = p + "[{(n ?? 1) - 1}]"
+                } else if (kd != TOML_TABLE) {
+                    this.fail_at("`" + p + "` is not a table")
+                    return ""
+                }
+            }
+            cur = p
+            k += 1
+        }
+        return cur
+    }
+
+    // `[a.b]` or `[[a.b]]`, positioned on the first '['.
+    func read_header() -> void {
+        this.i += 1
+        bool array = this.peek() == '['
+        if (array) {
+            this.i += 1
+        }
+        List[str] segs = this.read_dotted()
+        if (this.failed()) {
+            return
+        }
+        this.skip_blank()
+        if (this.peek() != ']' || (array && this.at(1) != ']')) {
+            this.fail_at("expected ']' to close the table header")
+            return
+        }
+        this.i += 1
+        if (array) {
+            this.i += 1
+        }
+        int32 last = cast[int32](segs.len()) - 1
+        str owner = this.walk("", segs, last)
+        if (this.failed()) {
+            return
+        }
+        str p = join_path(owner, segs.get(last))
+        int32 idx = this.doc.find(p)
+        if (array) {
+            if (idx < 0) {
+                this.add(p, TOML_TABLES, "1", 1)
+                this.add(p + "[0]", TOML_TABLE, "", 1)
+                this.table = p + "[0]"
+            } else if (this.doc.kinds.get(idx) == TOML_TABLES) {
+                int32? n = this.doc.values.get(idx).parse_int()
+                int32 count = n ?? 0
+                this.doc.values.set(idx, "{count + 1}")
+                this.add(p + "[{count}]", TOML_TABLE, "", 1)
+                this.table = p + "[{count}]"
+            } else {
+                this.fail_at("`" + p + "` is already defined, and not as an array of tables")
+            }
+        } else {
+            if (idx < 0) {
+                this.add(p, TOML_TABLE, "", 1)
+            } else if (this.doc.kinds.get(idx) == TOML_TABLE && this.doc.closed.get(idx) == 0) {
+                this.doc.closed.set(idx, 1)
+            } else {
+                this.fail_at("`" + p + "` is defined twice")
+                return
+            }
+            this.table = p
+        }
+        this.end_line()
+    }
+
+    // `key = value` inside table `base`.
+    func read_pair(str base) -> void {
+        List[str] segs = this.read_dotted()
+        if (this.failed()) {
+            return
+        }
+        this.skip_blank()
+        if (this.peek() != '=') {
+            this.fail_at("expected '=' after the key")
+            return
+        }
+        this.i += 1
+        this.skip_blank()
+        int32 last = cast[int32](segs.len()) - 1
+        str owner = this.walk(base, segs, last)
+        if (this.failed()) {
+            return
+        }
+        str p = join_path(owner, segs.get(last))
+        if (this.doc.has(p)) {
+            this.fail_at("`" + p + "` is defined twice")
+            return
+        }
+        this.read_value(p)
+    }
+
+    // A value, recorded at `path`.
+    func read_value(str path) -> void {
+        int32 c = this.peek()
+        if (c == '"' || c == '\'') {
+            str v = this.read_string()
+            if (!this.failed()) {
+                this.add(path, TOML_STRING, v, 0)
+            }
+        } else if (c == 't' && this.s.substring(this.i, this.i + 4) == "true") {
+            this.i += 4
+            this.add(path, TOML_BOOL, "true", 0)
+        } else if (c == 'f' && this.s.substring(this.i, this.i + 5) == "false") {
+            this.i += 5
+            this.add(path, TOML_BOOL, "false", 0)
+        } else if (c == '[') {
+            this.read_array(path)
+        } else if (c == '{') {
+            this.read_inline_table(path)
+        } else if (is_digit(c) || c == '+' || c == '-') {
+            this.read_integer(path)
+        } else if (c == 'i' || c == 'n') {
+            this.fail_at("floats (inf, nan) are not supported")
+        } else {
+            this.fail_at("expected a value")
+        }
+    }
+
+    func read_integer(str path) -> void {
+        int64 start = this.i
+        str digits = ""
+        if (this.peek() == '+' || this.peek() == '-') {
+            if (this.peek() == '-') {
+                digits = "-"
+            }
+            this.i += 1
+        }
+        if (this.peek() == '0' && (this.at(1) == 'x' || this.at(1) == 'o' || this.at(1) == 'b')) {
+            this.fail_at("hexadecimal, octal and binary integers are not supported")
+            return
+        }
+        bool any = false
+        while (is_digit(this.peek()) || (this.peek() == '_' && any && is_digit(this.at(1)))) {
+            if (this.peek() != '_') {
+                digits = digits + this.s.substring(this.i, this.i + 1)
+                any = true
+            }
+            this.i += 1
+        }
+        int32 c = this.peek()
+        if (c == '.' || c == 'e' || c == 'E') {
+            this.fail_at("floats are not supported")
+            return
+        }
+        if (c == '-' || c == ':') {
+            this.fail_at("dates and times are not supported; write the date as a string (\"2026-10-27\")")
+            return
+        }
+        if (!any) {
+            this.fail_at("expected a value")
+            return
+        }
+        int64? v = decimal_int64(digits)
+        if (v == null) {
+            this.fail_at("the integer " + this.s.substring(start, this.i) + " does not fit in 64 bits")
+            return
+        }
+        this.add(path, TOML_INT, "{v}", 0)
+    }
+
+    // `[v, v, ...]`: elements at path[0], path[1], ... Line breaks, comments
+    // and a trailing comma are allowed.
+    func read_array(str path) -> void {
+        this.i += 1
+        int32 at_index = cast[int32](this.doc.paths.len())
+        this.add(path, TOML_ARRAY, "0", 0)
+        int32 n = 0
+        this.skip_all()
+        while (this.peek() != ']' && !this.failed()) {
+            if (this.peek() == -1) {
+                this.fail_at("the array is not closed with ']'")
+                return
+            }
+            this.read_value(path + "[{n}]")
+            n += 1
+            this.skip_all()
+            if (this.peek() == ',') {
+                this.i += 1
+                this.skip_all()
+            } else if (this.peek() == -1) {
+                this.fail_at("the array is not closed with ']'")
+                return
+            } else if (this.peek() != ']') {
+                this.fail_at("expected ',' or ']' in the array")
+                return
+            }
+        }
+        this.i += 1
+        this.doc.values.set(at_index, "{n}")
+    }
+
+    // `{ k = v, ... }` on one line.
+    func read_inline_table(str path) -> void {
+        this.i += 1
+        this.add(path, TOML_TABLE, "", 1)
+        this.skip_blank()
+        if (this.peek() == '}') {
+            this.i += 1
+            return
+        }
+        bool more = true
+        while (more && !this.failed()) {
+            this.read_pair(path)
+            this.skip_blank()
+            if (this.peek() == ',') {
+                this.i += 1
+                this.skip_blank()
+            } else if (this.peek() == '}') {
+                this.i += 1
+                more = false
+            } else {
+                this.fail_at("expected ',' or '}' in the inline table")
+            }
+        }
+    }
+
+    // A basic ("...") or literal ('...') string on one line.
+    func read_string() -> str {
+        int32 q = this.peek()
+        if (this.at(1) == q && this.at(2) == q) {
+            this.fail_at("multi-line strings are not supported")
+            return ""
+        }
+        this.i += 1
+        List[str] parts = list_new()
+        int64 start = this.i
+        while (true) {
+            int32 c = this.peek()
+            if (c == -1 || c == '\n') {
+                this.fail_at("the string is not closed")
+                return ""
+            }
+            if (c == q) {
+                parts.push(this.s.substring(start, this.i))
+                this.i += 1
+                return parts.join()
+            }
+            if (c == '\\' && q == '"') {
+                parts.push(this.s.substring(start, this.i))
+                parts.push(this.read_escape())
+                if (this.failed()) {
+                    return ""
+                }
+                start = this.i
+            } else {
+                this.i += 1
+            }
+        }
+        return ""
+    }
+
+    // An escape in a basic string, positioned on the backslash.
+    func read_escape() -> str {
+        int32 e = this.at(1)
+        this.i += 2
+        if (e == 'n') {
+            return "\n"
+        }
+        if (e == 't') {
+            return "\t"
+        }
+        if (e == 'r') {
+            return "\r"
+        }
+        if (e == '"') {
+            return "\""
+        }
+        if (e == '\\') {
+            return "\\"
+        }
+        if (e == 'u' || e == 'U') {
+            int64 width = 4
+            if (e == 'U') {
+                width = 8
+            }
+            int64 code = 0
+            int64 k = 0
+            while (k < width) {
+                int32 h = this.peek()
+                int64 d = -1
+                if (h >= '0' && h <= '9') {
+                    d = cast[int64](h - '0')
+                } else if (h >= 'a' && h <= 'f') {
+                    d = cast[int64](h - 'a' + 10)
+                } else if (h >= 'A' && h <= 'F') {
+                    d = cast[int64](h - 'A' + 10)
+                }
+                if (d < 0) {
+                    this.fail_at("a \\u escape needs hexadecimal digits")
+                    return ""
+                }
+                code = code * 16 + d
+                this.i += 1
+                k += 1
+            }
+            if (code >= 32 && code <= 126) {
+                str printable = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz\{|\}~"
+                return printable.substring(code - 32, code - 31)
+            }
+            this.fail_at("\\u escapes are supported for printable ASCII only; write the character itself")
+            return ""
+        }
+        this.fail_at("unknown escape '\\" + this.s.substring(this.i - 1, this.i) + "'")
+        return ""
+    }
+}
+
+// Read a TOML document. On a mistake, `error` holds "line N: ..." and the
+// paths read so far are kept.
+pub func parse_toml(str src) -> Toml {
+    Toml doc = Toml { paths: list_new(), kinds: list_new(), values: list_new(), closed: list_new(), error: "" }
+    Reader r = Reader { s: src, i: 0, line: 1, doc: doc, table: "" }
+    r.skip_all()
+    while (r.peek() != -1 && !r.failed()) {
+        if (r.peek() == '[') {
+            r.read_header()
+        } else {
+            r.read_pair(r.table)
+            if (!r.failed()) {
+                r.end_line()
+            }
+        }
+        r.skip_all()
+    }
+    return r.doc
+}
