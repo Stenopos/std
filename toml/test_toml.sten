@@ -72,6 +72,8 @@ func test_scalars() -> int32 {
     f += expect(str_at(t, "n") == "<none>", "an integer is not a string")
     f += expect(int_at(t, "missing") == -1, "a missing key is null")
     f += expect(t.kind("name") == TOML_STRING && t.kind("n") == TOML_INT, "kinds")
+    Toml z = ok_doc("a = 0\nb = -0\nc = +0\nd = 10\n", "zeros read")
+    f += expect(int_at(z, "a") == 0 && int_at(z, "b") == 0 && int_at(z, "c") == 0 && int_at(z, "d") == 10, "zero (signed or not) is not a leading zero")
     return f
 }
 
@@ -142,6 +144,8 @@ func test_errors() -> int32 {
     f += expect_error("x = 1.5\n", "floats are not supported", "a float")
     f += expect_error("d = 2026-10-27\n", "dates and times are not supported", "a date")
     f += expect_error("h = 0xff\n", "hexadecimal", "a hex integer")
+    f += expect_error("z = 007\n", "leading zeros", "an integer with leading zeros")
+    f += expect_error("z = -0_1\n", "leading zeros", "a signed integer with a leading zero")
     f += expect_error("s = \"\"\"long\"\"\"\n", "multi-line strings", "a multi-line string")
     f += expect_error("s = \"open\n", "line 1: the string is not closed", "an unclosed string")
     f += expect_error("a = [1, 2\n", "the array is not closed", "an unclosed array")

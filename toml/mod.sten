@@ -22,8 +22,9 @@
 // integers (with `_` separators); booleans; arrays (over several lines, with
 // comments and a trailing comma); inline tables. Not supported, and reported
 // as an error rather than misread: multi-line strings, floats, dates and
-// times, hexadecimal/octal/binary integers, and `\u` escapes above ASCII
-// (write the character itself).
+// times, hexadecimal/octal/binary integers, and `\u`/`\U` escapes other than
+// printable ASCII (write the character itself; a control character can't be
+// written yet).
 //
 // Every error names its line. Security: a parsed document is untrusted input.
 
@@ -509,6 +510,12 @@ struct Reader {
         }
         if (this.peek() == '0' && (this.at(1) == 'x' || this.at(1) == 'o' || this.at(1) == 'b')) {
             this.fail_at("hexadecimal, octal and binary integers are not supported")
+            return
+        }
+        // TOML forbids leading zeros (`007`): another reader would refuse the
+        // document, so this one must not read it as 7.
+        if (this.peek() == '0' && (is_digit(this.at(1)) || this.at(1) == '_')) {
+            this.fail_at("an integer can't have leading zeros")
             return
         }
         bool any = false
