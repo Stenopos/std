@@ -152,9 +152,8 @@ pub func from_str(str s) -> List[int32] {
     return out
 }
 
-// True when every byte in `buf` is one `to_str` can reconstruct: NUL, TAB, LF,
-// CR, or printable ASCII (0x20-0x7E). Check this before calling `to_str` on a
-// buffer of unknown origin to avoid the thrown error below.
+// True when `buf` is plain ASCII text: every byte is NUL, TAB, LF, CR or
+// printable ASCII (0x20-0x7E).
 pub func is_text(List[int32] buf) -> bool {
     int64 n = buf.len()
     int64 i = 0
@@ -169,34 +168,18 @@ pub func is_text(List[int32] buf) -> bool {
     return true
 }
 
-// Reconstruct a string from `buf`.
-//
-// Subset limitation: Stenopos source files must be valid UTF-8, so there is no
-// way to write a single standalone byte literal for values 128..255. This
-// faithfully round-trips NUL/TAB/LF/CR and printable ASCII (0x20-0x7E) — i.e.
-// anything `is_text` accepts — and `throw`s on any other byte rather than
-// silently corrupting data. Use `is_text` first, or `std.hex` for opaque binary.
+// The string holding exactly the bytes in `buf` (each 0-255; a str is a byte
+// string, so any byte round-trips). Throws on an element that is not a byte.
 pub func to_str(List[int32] buf) -> str {
-    str printable = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz\{|\}~"
     List[str] parts = list_new()
     int64 n = buf.len()
     int64 i = 0
     while (i < n) {
         int32 b = buf.get(i)
-        if (b == 0) {
-            parts.push("\0")
-        } else if (b == 9) {
-            parts.push("\t")
-        } else if (b == 10) {
-            parts.push("\n")
-        } else if (b == 13) {
-            parts.push("\r")
-        } else if (b >= 32 && b <= 126) {
-            int64 k = cast[int64](b - 32)
-            parts.push(printable.substring(k, k + 1))
-        } else {
-            throw("bytes.to_str: byte {b} at index {i} is outside the representable set (NUL/TAB/LF/CR, 0x20-0x7E) — check is_text() first")
+        if (b < 0 || b > 255) {
+            throw("bytes.to_str: {b} at index {i} is not a byte (0-255)")
         }
+        parts.push(str_from_byte(b))
         i += 1
     }
     return parts.join()

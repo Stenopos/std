@@ -22,13 +22,13 @@
 // integers (with `_` separators); booleans; arrays (over several lines, with
 // comments and a trailing comma); inline tables. Not supported, and reported
 // as an error rather than misread: multi-line strings, floats, dates and
-// times, hexadecimal/octal/binary integers, and escapes that make a control
-// character (`\b`, `\f`, and `\u`/`\U` outside printable ASCII; write any
-// other character itself).
+// times, and hexadecimal/octal/binary integers.
 //
 // Every error names its line. Security: a parsed document is untrusted input.
 
 module std.toml
+
+import std.string.{from_code_point}
 
 pub const int32 TOML_STRING = 0
 pub const int32 TOML_INT = 1
@@ -657,6 +657,12 @@ struct Reader {
         if (e == '\\') {
             return "\\"
         }
+        if (e == 'b') {
+            return str_from_byte(8)
+        }
+        if (e == 'f') {
+            return str_from_byte(12)
+        }
         if (e == 'u' || e == 'U') {
             int64 width = 4
             if (e == 'U') {
@@ -682,12 +688,15 @@ struct Reader {
                 this.i += 1
                 k += 1
             }
-            if (code >= 32 && code <= 126) {
-                str printable = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz\{|\}~"
-                return printable.substring(code - 32, code - 31)
+            str? ch = null
+            if (code <= 0x10FFFF) {
+                ch = from_code_point(cast[int32](code))
             }
-            this.fail_at("\\u escapes are supported for printable ASCII only; write the character itself")
-            return ""
+            if (ch == null) {
+                this.fail_at("\\" + this.s.substring(this.i - width - 1, this.i) + " is not a Unicode character (a surrogate, or above U+10FFFF)")
+                return ""
+            }
+            return ch
         }
         this.fail_at("unknown escape '\\" + this.s.substring(this.i - 1, this.i) + "'")
         return ""

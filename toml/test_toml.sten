@@ -80,7 +80,15 @@ func test_scalars() -> int32 {
 func test_escapes() -> int32 {
     println("escapes")
     Toml t = ok_doc("s = \"a\\tb\\n\\\"q\\\"\\\\ \\u0041\"\n", "escapes read")
-    return expect_str(str_at(t, "s"), "a\tb\n\"q\"\\ A", "\\t \\n \\\" \\\\ \\u0041")
+    int32 f = expect_str(str_at(t, "s"), "a\tb\n\"q\"\\ A", "\\t \\n \\\" \\\\ \\u0041")
+    // Every escape TOML has: control characters and any Unicode character.
+    Toml u = ok_doc("b = \"\\b\\f\\u0001\"\ne = \"\\u00e9\\u20AC\\U0001F989\"\n", "control and Unicode escapes read")
+    str b = str_at(u, "b")
+    f += expect(b.len() == 3 && b.byte_at(0) == 8 && b.byte_at(1) == 12 && b.byte_at(2) == 1, "\\b \\f \\u0001")
+    f += expect_str(str_at(u, "e"), "é€🦉", "\\u00e9 \\u20AC \\U0001F989 as UTF-8")
+    f += expect_error("s = \"\\uD800\"\n", "is not a Unicode character", "a surrogate escape")
+    f += expect_error("s = \"\\U00110000\"\n", "is not a Unicode character", "an escape above U+10FFFF")
+    return f
 }
 
 func test_tables() -> int32 {
@@ -152,7 +160,6 @@ func test_errors() -> int32 {
     f += expect_error("a = 1 b = 2\n", "expected the end of the line", "two pairs on a line")
     f += expect_error("= 1\n", "expected a key", "no key")
     f += expect_error("n = 9223372036854775808\n", "does not fit in 64 bits", "an integer overflow")
-    f += expect_error("s = \"\\u00e9\"\n", "printable ASCII only", "a non-ASCII \\u escape")
     f += expect_error("a.b = 1\na.b.c = 2\n", "`a.b` is not a table", "a key under a value")
     return f
 }

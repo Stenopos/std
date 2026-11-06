@@ -7,7 +7,7 @@ module std.string.tests
 import std.string.{is_space, is_digit, is_alpha, is_alnum, is_upper, is_lower}
 import std.string.{is_empty, matches_at, starts_with, ends_with, index_of, contains, count}
 import std.string.{split, join, repeat_str, trim, trim_start, trim_end}
-import std.string.{to_upper, to_lower, pad_left, pad_right}
+import std.string.{to_upper, to_lower, pad_left, pad_right, from_code_point}
 
 func expect(bool cond, str name) -> int32 {
     if (cond) {
@@ -24,6 +24,18 @@ func expect_str(str got, str want, str name) -> int32 {
     }
     println("  FAIL {name}: got '{got}', want '{want}'")
     return 1
+}
+
+func test_code_points() -> int32 {
+    int32 fails = 0
+    fails += expect((from_code_point(65) ?? "") == "A", "from_code_point: ASCII")
+    fails += expect((from_code_point(0xE9) ?? "") == "é", "from_code_point: two bytes")
+    fails += expect((from_code_point(0x20AC) ?? "") == "€", "from_code_point: three bytes")
+    fails += expect((from_code_point(0x1F989) ?? "") == "🦉", "from_code_point: four bytes")
+    fails += expect((from_code_point(0) ?? "x").len() == 1, "from_code_point: NUL is one byte")
+    fails += expect(from_code_point(0xD800) == null && from_code_point(0xDFFF) == null, "from_code_point: surrogates are not characters")
+    fails += expect(from_code_point(0x110000) == null && from_code_point(-1) == null, "from_code_point: out of range")
+    return fails
 }
 
 func test_classification() -> int32 {
@@ -114,6 +126,7 @@ func main() -> void {
     int32 fails = 0
     println("std.string tests:")
     fails += test_classification()
+    fails += test_code_points()
     fails += test_queries()
     fails += test_split_join()
     fails += test_transformations()

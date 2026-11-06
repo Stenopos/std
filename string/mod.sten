@@ -11,6 +11,25 @@ module std.string
 // Character (byte) classification — take the int32 code from str.byte_at()
 // ---------------------------------------------------------------------------
 
+// The UTF-8 encoding of Unicode code point `cp` (1 to 4 bytes), or null when
+// it is not a character: negative, above U+10FFFF, or a surrogate
+// (U+D800-U+DFFF).
+pub func from_code_point(int32 cp) -> str? {
+    if (cp < 0 || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) {
+        return null
+    }
+    if (cp < 0x80) {
+        return str_from_byte(cp)
+    }
+    if (cp < 0x800) {
+        return str_from_byte(0xC0 | (cp >> 6)) + str_from_byte(0x80 | (cp & 0x3F))
+    }
+    if (cp < 0x10000) {
+        return str_from_byte(0xE0 | (cp >> 12)) + str_from_byte(0x80 | ((cp >> 6) & 0x3F)) + str_from_byte(0x80 | (cp & 0x3F))
+    }
+    return str_from_byte(0xF0 | (cp >> 18)) + str_from_byte(0x80 | ((cp >> 12) & 0x3F)) + str_from_byte(0x80 | ((cp >> 6) & 0x3F)) + str_from_byte(0x80 | (cp & 0x3F))
+}
+
 // True for ASCII whitespace: space, tab, newline, carriage return.
 pub func is_space(int32 c) -> bool {
     return c == ' ' || c == '\t' || c == '\n' || c == '\r'
