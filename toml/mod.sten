@@ -22,9 +22,9 @@
 // integers (with `_` separators); booleans; arrays (over several lines, with
 // comments and a trailing comma); inline tables. Not supported, and reported
 // as an error rather than misread: multi-line strings, floats, dates and
-// times, hexadecimal/octal/binary integers, and `\u`/`\U` escapes other than
-// printable ASCII (write the character itself; a control character can't be
-// written yet).
+// times, hexadecimal/octal/binary integers, and escapes that make a control
+// character (`\b`, `\f`, and `\u`/`\U` outside printable ASCII; write any
+// other character itself).
 //
 // Every error names its line. Security: a parsed document is untrusted input.
 
