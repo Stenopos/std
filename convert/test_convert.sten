@@ -5,7 +5,7 @@ module std.convert.tests
 
 import std.testing.{expect, expect_eq_int, expect_eq_str, report}
 import std.convert.{int_to_str, int64_to_str, float_to_str, bool_to_str}
-import std.convert.{is_int, parse_int, str_to_int}
+import std.convert.{is_int, parse_int, str_to_int, parse_int64, parse_int32}
 
 func main() -> int32 {
     int32 fails = 0
@@ -34,6 +34,31 @@ func main() -> int32 {
     fails += expect_eq_int(parse_int("100"), 100, "parse_int 100")
     fails += expect_eq_int(parse_int("42abc"), 42, "parse_int stops at non-digit")
     fails += expect_eq_int(str_to_int("999"), 999, "str_to_int alias")
+
+    // parse_int64: strict, null for anything that isn't a whole int64
+    fails += expect((parse_int64("42") ?? 0) == 42, "parse_int64 42")
+    fails += expect((parse_int64("-7") ?? 0) == -7, "parse_int64 -7")
+    fails += expect((parse_int64("+7") ?? 0) == 7, "parse_int64 +7")
+    fails += expect((parse_int64("0") ?? 1) == 0, "parse_int64 0")
+    fails += expect((parse_int64("2147483648") ?? 0) == 2147483648, "parse_int64 past int32")
+    fails += expect((parse_int64("4102444800") ?? 0) == 4102444800, "parse_int64 an epoch second in 2100")
+    fails += expect((parse_int64("9223372036854775807") ?? 0) == 9223372036854775807, "parse_int64 max")
+    fails += expect((parse_int64("-9223372036854775808") ?? 0) == -9223372036854775807 - 1, "parse_int64 min")
+    fails += expect(parse_int64("9223372036854775808") == null, "parse_int64 max + 1 -> null")
+    fails += expect(parse_int64("-9223372036854775809") == null, "parse_int64 min - 1 -> null")
+    fails += expect(parse_int64("99999999999999999999999") == null, "parse_int64 far past max -> null")
+    fails += expect(parse_int64("") == null, "parse_int64 empty -> null")
+    fails += expect(parse_int64("-") == null, "parse_int64 lone sign -> null")
+    fails += expect(parse_int64(" 42") == null, "parse_int64 space -> null")
+    fails += expect(parse_int64("42abc") == null, "parse_int64 trailing junk -> null")
+    fails += expect(parse_int64("4.5") == null, "parse_int64 float -> null")
+    fails += expect(parse_int64("--1") == null, "parse_int64 two signs -> null")
+
+    // parse_int32
+    fails += expect((parse_int32("-2147483648") ?? 0) == -2147483647 - 1, "parse_int32 min")
+    fails += expect((parse_int32("2147483647") ?? 0) == 2147483647, "parse_int32 max")
+    fails += expect(parse_int32("2147483648") == null, "parse_int32 max + 1 -> null")
+    fails += expect(parse_int32("x") == null, "parse_int32 junk -> null")
 
     // round trip
     fails += expect_eq_int(parse_int(int_to_str(12345)), 12345, "int_to_str -> parse_int round trip")

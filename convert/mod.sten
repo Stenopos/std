@@ -1,12 +1,14 @@
 // Stenopos standard library — convert module
 // Conversions between the primitive types and strings: value → string via
-// interpolation, and string → int via a hand-written decimal parser.
+// interpolation, and string → integer via strict decimal parsers.
 //
-//   import std.convert.{int_to_str, parse_int, bool_to_str}
+//   import std.convert.{int_to_str, parse_int64, bool_to_str}
 //
 // The `*_to_str` helpers wrap Stenopos's string interpolation so a conversion
-// reads as a named call. `parse_int` accepts an optional leading `-` and
-// decimal digits; `is_int` reports whether a whole string is a valid integer.
+// reads as a named call. `parse_int64` and `parse_int32` accept an optional
+// sign and decimal digits, and nothing else: anything else, or a value out of
+// the type's range, is null. `is_int` reports whether a whole string is a
+// decimal integer.
 
 module std.convert
 
@@ -57,9 +59,64 @@ pub func is_int(str s) -> bool {
     return true
 }
 
+// The int64 a decimal string spells: an optional `+` or `-`, then one or
+// more digits, and nothing else. Null for anything else, including spaces
+// and a value beyond int64 (which holds epoch seconds past 2038).
+pub func parse_int64(str s) -> int64? {
+    int64 n = s.len()
+    int64 i = 0
+    bool neg = false
+    if (n > 0 && (s.byte_at(0) == '-' || s.byte_at(0) == '+')) {
+        neg = s.byte_at(0) == '-'
+        i = 1
+    }
+    if (i == n) {
+        return null
+    }
+    // Accumulated as a negative number, whose range reaches the most
+    // negative int64; each step is checked before it could overflow.
+    int64 lowest = -9223372036854775807 - 1
+    int64 v = 0
+    while (i < n) {
+        int32 c = s.byte_at(i)
+        if (c < '0' || c > '9') {
+            return null
+        }
+        int64 d = cast[int64](c - '0')
+        if (v < (lowest + d) / 10) {
+            return null
+        }
+        v = v * 10 - d
+        i = i + 1
+    }
+    if (neg) {
+        return v
+    }
+    if (v == lowest) {
+        return null
+    }
+    return 0 - v
+}
+
+// The int32 a decimal string spells, by the rules of `parse_int64`; null
+// when it is not one or doesn't fit in an int32.
+pub func parse_int32(str s) -> int32? {
+    int64? v = parse_int64(s)
+    if (v == null) {
+        return null
+    }
+    int64 x = v
+    if (x < -2147483648 || x > 2147483647) {
+        return null
+    }
+    return cast[int32](x)
+}
+
 // Parse a decimal string to an int32. Accepts an optional leading `-`; stops
 // at the first non-digit (so " 42 " → 0, "42abc" → 42). Returns 0 for a
-// string with no leading digits. Use `is_int` first if you need to be strict.
+// string with no leading digits, and stops the program when the digits
+// overflow an int32. Replaced by `parse_int32`, which reports both as null.
+@deprecated("use parse_int32 (null for bad input) or parse_int64")
 pub func parse_int(str s) -> int32 {
     int64 n = s.len()
     int64 i = 0
@@ -85,6 +142,7 @@ pub func parse_int(str s) -> int32 {
 }
 
 // An alias reading well as `str_to_int(s)`.
+@deprecated("use parse_int32 (null for bad input) or parse_int64")
 pub func str_to_int(str s) -> int32 {
     return parse_int(s)
 }
