@@ -1,0 +1,74 @@
+// std.os exec and signals: a program run without a shell, its output,
+// environment, directory and input, and a signal delivered to this program.
+
+module std.os.exec_tests
+
+import std.os.{Output, ExecOptions, execute, execute_with, environ, watch_signals, wait_signal, SIGTERM, SIGHUP}
+
+func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   " + name)
+        return 0
+    }
+    println("  FAIL " + name)
+    return 1
+}
+
+// The message execute throws, or "exit 127" when the program "ran" and
+// exited 127: under valgrind (and with some C libraries) posix_spawn can't
+// report that the program wasn't found, so the child exits 127, the shell's
+// "command not found" status.
+@cap(Process)
+func error_of_exec(List[str] argv) -> str {
+    try {
+        Output o = execute(argv)
+        if (o.code == 127) {
+            return "exit 127"
+        }
+    } catch (str e) {
+        return e
+    }
+    return ""
+}
+
+@cap(Process)
+func main() -> void {
+    int32 fails = 0
+    println("std.os exec tests:")
+    // Arguments go through untouched: no shell sees them.
+    Output o = execute(["echo", "a'; rm -rf / $(id)", "*", "two words"])
+    fails += expect(o.code == 0 && o.stdout == "a'; rm -rf / $(id) * two words\n", "arguments reach the program as given: " + o.stdout)
+    // Exit status and both streams.
+    Output s = execute(["sh", "-c", "echo out; echo err >&2; exit 3"])
+    fails += expect(s.code == 3 && s.stdout == "out\n" && s.stderr == "err\n", "exit status, stdout and stderr apart")
+    // A child gets an empty environment unless given one.
+    fails += expect(execute(["env"]).stdout == "", "an empty environment by default")
+    List[str] mine = ["ONLY=this"]
+    Output e = execute_with(["env"], ExecOptions { env: mine, dir: "", stdin: "" })
+    fails += expect(e.stdout == "ONLY=this\n", "execute_with passes exactly its environment")
+    fails += expect(environ().len() > 0, "environ() lists this program's environment")
+    List[str] none = list_new()
+    Output d = execute_with(["pwd"], ExecOptions { env: none, dir: "/", stdin: "" })
+    fails += expect(d.stdout == "/\n", "execute_with runs in its directory")
+    Output c = execute_with(["cat"], ExecOptions { env: none, dir: "", stdin: "fed in" })
+    fails += expect(c.stdout == "fed in", "execute_with feeds standard input")
+    // Lots of output on both streams at once must not stall either side.
+    Output big = execute(["sh", "-c", "i=0; while [ $i -lt 3000 ]; do echo out-line-$i; echo err-line-$i >&2; i=$((i+1)); done"])
+    fails += expect(big.code == 0 && big.stdout.len() > 30000 && big.stderr.len() > 30000, "large output on both streams ({big.stdout.len()} and {big.stderr.len()} bytes)")
+    // Ended by a signal: 128 + its number.
+    fails += expect(execute(["sh", "-c", "kill -TERM $$"]).code == 143, "a child ended by SIGTERM reports 143")
+    // Not startable: an exception with the reason.
+    str err = error_of_exec(["no-such-program-xyz"])
+    fails += expect(err == "exec no-such-program-xyz: no such file or directory" || err == "exit 127", "a missing program throws: " + err)
+
+    // Signals: SIGTERM is watched, so it no longer ends this program.
+    watch_signals([SIGTERM, SIGHUP])
+    fails += expect(wait_signal(20) == null, "wait_signal times out when nothing arrives")
+    discard execute(["sh", "-c", "kill -TERM $PPID"])
+    int32? got = wait_signal(2000)
+    fails += expect((got ?? 0) == SIGTERM, "a watched SIGTERM is delivered to wait_signal")
+    if (fails > 0) {
+        fail("FAIL: {fails} check(s) failed")
+    }
+    println("PASS: all std.os exec checks passed")
+}

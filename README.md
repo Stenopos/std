@@ -14,7 +14,7 @@ written in Stenopos itself.
 | `sort` | Sorting and searching | **Implemented + tested** |
 | `algo` | Small algorithms over `List[int32]` | **Implemented + tested** |
 | `io` | read_lines / write_lines / append_file over the file built-ins | **Implemented + tested** |
-| `os` | Process + argv helpers: run / run_ok / argc / arg_at / args / has_flag | **Implemented + tested** |
+| `os` | Programs without a shell: `execute(argv)`, `execute_with(argv, ExecOptions)` -> `Output { code, stdout, stderr }`; `environ()`; signals: `watch_signals`, `wait_signal`, `SIGTERM`...; the shell when wanted (`run`); argv helpers. execute and signals need Syntagma rc.7 | **Implemented + tested** |
 | `time` | Clocks (`unix`, `mono_ns`), `sleep_ms`, the UTC/local calendar, `format`/`rfc3339` (int64 seconds: exact past 2038). Needs Syntagma rc.7 | **Implemented + tested** |
 | `convert` | Primitive ↔ string: int/int64/float/bool_to_str, parse_int, is_int | **Implemented + tested** |
 | `fmt` | Number and string formatting, radix conversion | **Implemented + tested** |
@@ -56,6 +56,7 @@ stenopos run os/test_os.sten
 stenopos run time/test_time.sten
 stenopos run net/test_net.sten
 stenopos run fs/test_fs.sten
+stenopos run os/test_exec.sten
 stenopos run convert/test_convert.sten
 stenopos run assert/test_assert.sten
 ```

@@ -1,6 +1,7 @@
 // Stenopos standard library — os module
-// Thin, named wrappers over the process/CLI built-ins (exec / arg_count /
-// arg), plus small conveniences for reading argv.
+// Running programs without a shell (execute, execute_with), signals
+// (watch_signals, wait_signal), the shell when you need it (run), and the
+// arguments the program was started with.
 //
 //   import std.os.{run, argc, arg, args, program_name}
 //
@@ -9,8 +10,138 @@
 
 module std.os
 
+import std.convert.{parse_int32, parse_int64}
+
+// ---------------------------------------------------------------------------
+// Running programs (ADR-0043 §3.6)
+// ---------------------------------------------------------------------------
+
+// What a program printed and how it ended.
+pub struct Output {
+    pub int32 code       // its exit status; 128 + N when signal N ended it
+    pub str stdout
+    pub str stderr
+}
+
+// How to run a program: its environment (KEY=VALUE entries; empty means
+// nothing is inherited, see environ()), its working directory ("" = this
+// one) and what to feed its standard input.
+pub struct ExecOptions {
+    pub List[str] env
+    pub str dir
+    pub str stdin
+}
+
+func nul_join(List[str] parts) -> str {
+    str z = str_from_byte(0)
+    str out = ""
+    for (p in parts) {
+        out = out + p + z
+    }
+    return out
+}
+
+// Run a program with its arguments as given: no shell, so nothing in them
+// is split, expanded or interpreted (`execute(["tar", "-czf", out, dir])` is
+// safe whatever `out` and `dir` hold). The program is looked up on PATH;
+// it gets an empty environment and empty standard input. Waits for it and
+// returns its output and exit status; a non-zero status is not an error.
+// Throws only when it can't be started (`exec tar: no such file or
+// directory`). (Named execute: the `exec` built-in is the shell path.)
+@cap(Process)
+pub func execute(List[str] argv) -> Output {
+    List[str] none = list_new()
+    return execute_with(argv, ExecOptions { env: none, dir: "", stdin: "" })
+}
+
+// execute with an environment, a working directory and standard input.
+@cap(Process)
+pub func execute_with(List[str] argv, ExecOptions opts) -> Output {
+    str prog = ""
+    if (argv.len() > 0) {
+        prog = argv.get(0)
+    }
+    str r = os_exec(nul_join(argv), nul_join(opts.env), opts.dir, opts.stdin)
+    if (r == "") {
+        throw("exec " + prog + ": " + os_error())
+    }
+    int64 nl = r.index_of("\n")
+    List[str] head = r.substring(0, nl).split(" ")
+    int64 olen = parse_int64(head.get(1)) ?? cast[int64](0)
+    str rest = r.substring(nl + 1, r.len())
+    return Output {
+        code: parse_int32(head.get(0)) ?? (0 - 1),
+        stdout: rest.substring(0, olen),
+        stderr: rest.substring(olen, rest.len())
+    }
+}
+
+// This program's own environment, as KEY=VALUE entries: pass it (or part
+// of it) to execute_with when a child should inherit it.
+@cap(Process)
+pub func environ() -> List[str] {
+    str all = os_environ()
+    List[str] out = list_new()
+    if (all == "") {
+        return out
+    }
+    for (e in all.split(str_from_byte(0))) {
+        if (e != "") {
+            out.push(e)
+        }
+    }
+    return out
+}
+
+// ---------------------------------------------------------------------------
+// Signals (ADR-0043 §3.6)
+// ---------------------------------------------------------------------------
+
+// The signals a service usually handles (the same numbers on Linux and macOS).
+pub const int32 SIGHUP = 1
+pub const int32 SIGINT = 2
+pub const int32 SIGQUIT = 3
+pub const int32 SIGTERM = 15
+
+// Deliver `sigs` to wait_signal instead of their default action (which, for
+// SIGTERM, ends the program at once). Kubernetes sends SIGTERM and waits 30 s
+// before SIGKILL: watch it, finish what you are doing, then exit.
+@cap(Process)
+pub func watch_signals(List[int32] sigs) -> void {
+    str list = ""
+    for (s in sigs) {
+        if (list != "") {
+            list = list + ","
+        }
+        list = list + "{s}"
+    }
+    if (sig_watch(list) < 0) {
+        throw("watch_signals: " + os_error())
+    }
+}
+
+// The next watched signal, waiting up to `ms` milliseconds (negative:
+// forever); null when none arrived in time.
+@cap(Process)
+pub func wait_signal(int32 ms) -> int32? {
+    int32 s = sig_wait(ms)
+    if (s < 0) {
+        throw("wait_signal: " + os_error())
+    }
+    if (s == 0) {
+        return null
+    }
+    return s
+}
+
+// ---------------------------------------------------------------------------
+// The shell, and this program's arguments
+// ---------------------------------------------------------------------------
+
 // Run a shell command; returns its exit code (127 if it could not be run).
-// The command is passed to the system shell, so redirection and pipes work.
+// The command is passed to the system shell, so redirection and pipes work,
+// and so does anything an attacker can put in it: prefer execute, which takes
+// the arguments as a list and runs no shell.
 @cap(Process)
 pub func run(str command) -> int32 {
     return exec(command)
