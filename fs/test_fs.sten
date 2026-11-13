@@ -1,0 +1,97 @@
+module std.fs.tests
+
+// std.fs in a private temporary directory, removed at the end.
+import std.fs.{FileInfo, read, write_atomic, write_atomic_mode, list_dir, stat, exists, mkdir_all, rename, remove, remove_all, chmod, temp_dir, set_umask}
+
+func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   " + name)
+        return 0
+    }
+    println("  FAIL " + name)
+    return 1
+}
+
+@cap(File)
+func error_of_read(str path) -> str {
+    try {
+        discard read(path)
+    } catch (str e) {
+        return e
+    }
+    return ""
+}
+
+@cap(File)
+func error_of_remove(str path) -> str {
+    try {
+        remove(path)
+    } catch (str e) {
+        return e
+    }
+    return ""
+}
+
+@cap(File)
+func error_of_list(str path) -> str {
+    try {
+        discard list_dir(path)
+    } catch (str e) {
+        return e
+    }
+    return ""
+}
+
+@cap(File)
+func main() -> void {
+    int32 fails = 0
+    println("std.fs tests:")
+    int32 old = set_umask(0o022)
+    str d = temp_dir("stdfs")
+    FileInfo di = stat(d)
+    fails += expect(di.is_dir && !di.is_file && di.mode == 0o700, "temp_dir is a directory only we can enter (0o{di.mode})")
+
+    // read: missing is null, empty is "", text is text.
+    fails += expect(read(d + "/nope") == null, "read of a missing file is null")
+    write_atomic(d + "/empty", "")
+    str? e = read(d + "/empty")
+    fails += expect(e != null && e == "", "read of an empty file is \"\", not null")
+    write_atomic_mode(d + "/secret", "line 1\nline 2\n", 0o600)
+    fails += expect((read(d + "/secret") ?? "") == "line 1\nline 2\n", "write_atomic then read gives the text back")
+    FileInfo si = stat(d + "/secret")
+    fails += expect(si.is_file && si.size == 14 && si.mode == 0o600, "stat: a 14-byte file, mode 0o600")
+    fails += expect(si.mtime > 1767225600, "stat: mtime is recent")
+    write_atomic(d + "/secret", "replaced")
+    fails += expect(stat(d + "/secret").mode == 0o600, "write_atomic over a file keeps its mode")
+    fails += expect(stat(d + "/empty").mode == 0o644, "a new file gets 0666 less the umask (0o644)")
+
+    // Directories.
+    mkdir_all(d + "/a/b/c", 0o755)
+    mkdir_all(d + "/a/b/c", 0o755)
+    fails += expect(stat(d + "/a/b/c").is_dir, "mkdir_all makes every level, twice is fine")
+    write_atomic(d + "/a/z.txt", "z")
+    write_atomic(d + "/a/m.txt", "m")
+    List[str] names = list_dir(d + "/a")
+    fails += expect(names.len() == 3 && names.get(0) == "b" && names.get(1) == "m.txt" && names.get(2) == "z.txt", "list_dir is sorted, without . and ..")
+    fails += expect(list_dir(d + "/a/b/c").len() == 0, "an empty directory lists nothing")
+    fails += expect(error_of_list(d + "/nope") == "list_dir " + d + "/nope: no such file or directory", "list_dir of a missing directory throws with the reason")
+
+    // Rename, chmod, remove.
+    rename(d + "/a/m.txt", d + "/a/n.txt")
+    fails += expect(!exists(d + "/a/m.txt") && exists(d + "/a/n.txt"), "rename moves a file")
+    chmod(d + "/a/n.txt", 0o640)
+    fails += expect(stat(d + "/a/n.txt").mode == 0o640, "chmod sets the mode")
+    fails += expect(error_of_remove(d + "/a") == "remove " + d + "/a: directory not empty", "remove of a non-empty directory throws")
+    fails += expect(error_of_read(d + "/a") == "read " + d + "/a: is a directory", "read of a directory throws")
+    remove(d + "/a/n.txt")
+    fails += expect(!exists(d + "/a/n.txt"), "remove deletes a file")
+    remove_all(d)
+    fails += expect(!exists(d), "remove_all removes the whole tree")
+    remove_all(d)
+    fails += expect(!exists(d), "remove_all of something missing is fine")
+    fails += expect(set_umask(old) == 0o022, "set_umask returns the previous umask")
+    if (fails > 0) {
+        fail("FAIL: {fails} check(s) failed")
+    }
+    println("PASS: all std.fs checks passed")
+}

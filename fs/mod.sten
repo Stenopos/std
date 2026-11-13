@@ -1,0 +1,187 @@
+// Stenopos standard library — fs module (ADR-0043 §3.7)
+//
+// Files and directories, without a shell. Every function declares
+// @cap(File).
+//
+//   List[str] names = list_dir("/backups")        // sorted, no . or ..
+//   FileInfo i = stat(path)                       // size, mtime, mode, kind
+//   str? text = read(path)                        // null: no such file
+//   write_atomic(path, text)                      // never a half-written file
+//   mkdir_all(dir, 0o700)
+//   rename(a, b); remove(path); remove_all(dir); chmod(path, 0o600)
+//   str tmp = temp_dir("backup")                  // mode 0700
+//   int32 old = set_umask(0o077)
+//
+// A failure throws, naming the operation, the path and the system's reason:
+// `read /etc/shadow: permission denied`, `mkdir_all /data/x: no space left
+// on device`. A missing file is not a failure for `read` (null) and
+// `remove_all` (nothing to do), only for the rest.
+module std.fs
+
+import std.convert.{parse_int32, parse_int64}
+
+// What `stat` reports about a path. A symbolic link is described itself,
+// not followed.
+pub struct FileInfo {
+    pub int64 size       // bytes
+    pub int64 mtime      // last modified, Unix seconds
+    pub int32 mode       // permission bits (0o644...)
+    pub bool is_file
+    pub bool is_dir
+    pub bool is_link
+}
+
+@cap(File)
+func fail_on(str op, str path) -> void {
+    throw(op + " " + path + ": " + fs_error())
+}
+
+// The contents of `path`, or null when it doesn't exist. Throws for any
+// other failure (a directory, no permission...).
+@cap(File)
+pub func read(str path) -> str? {
+    str text = fs_read(path)
+    if (text == "" && fs_error() != "") {
+        if (fs_missing() == 1) {
+            return null
+        }
+        fail_on("read", path)
+    }
+    return text
+}
+
+// Write `text` to `path` so that a reader (or a crash) sees the old
+// contents or the new, never part of either: a temporary file beside it,
+// flushed to disk, renamed over it. A new file gets 0666 less the umask;
+// an existing one keeps its permissions.
+@cap(File)
+pub func write_atomic(str path, str text) -> void {
+    if (fs_write_atomic(path, text, 0 - 1) < 0) {
+        fail_on("write_atomic", path)
+    }
+}
+
+// write_atomic with the file's permissions set to `mode` (0o600...).
+@cap(File)
+pub func write_atomic_mode(str path, str text, int32 mode) -> void {
+    if (fs_write_atomic(path, text, mode) < 0) {
+        fail_on("write_atomic", path)
+    }
+}
+
+// The names in directory `dir`, sorted, without . and ..
+@cap(File)
+pub func list_dir(str dir) -> List[str] {
+    str all = fs_list_dir(dir)
+    if (all == "") {
+        if (fs_error() != "") {
+            fail_on("list_dir", dir)
+        }
+        List[str] none = list_new()
+        return none
+    }
+    return all.split("\n")
+}
+
+// What kind of thing `path` is, its size, modification time and mode.
+// Throws when it doesn't exist (see exists).
+@cap(File)
+pub func stat(str path) -> FileInfo {
+    str st = fs_stat(path)
+    if (st == "") {
+        fail_on("stat", path)
+    }
+    List[str] f = st.split(" ")
+    str kind = f.get(3)
+    return FileInfo {
+        size: parse_int64(f.get(0)) ?? cast[int64](0),
+        mtime: parse_int64(f.get(1)) ?? cast[int64](0),
+        mode: parse_int32(f.get(2)) ?? 0,
+        is_file: kind == "f",
+        is_dir: kind == "d",
+        is_link: kind == "l"
+    }
+}
+
+// Does `path` exist (a link counts, even a dangling one)?
+@cap(File)
+pub func exists(str path) -> bool {
+    if (fs_stat(path) != "") {
+        return true
+    }
+    if (fs_missing() == 1) {
+        return false
+    }
+    fail_on("exists", path)
+    return false
+}
+
+// Make directory `dir` and any missing parents, each with `mode`. Nothing
+// to do if it exists already.
+@cap(File)
+pub func mkdir_all(str dir, int32 mode) -> void {
+    if (fs_mkdir_all(dir, mode) < 0) {
+        fail_on("mkdir_all", dir)
+    }
+}
+
+// Rename `from` to `to`, replacing `to`: atomic within one filesystem.
+@cap(File)
+pub func rename(str from, str to) -> void {
+    if (fs_rename(from, to) < 0) {
+        throw("rename " + from + " to " + to + ": " + fs_error())
+    }
+}
+
+// Remove a file, a link, or an empty directory.
+@cap(File)
+pub func remove(str path) -> void {
+    if (fs_remove(path) < 0) {
+        fail_on("remove", path)
+    }
+}
+
+// Remove `path` and, if it is a directory, everything in it. Links are
+// removed, not followed. Nothing to do if it doesn't exist.
+@cap(File)
+pub func remove_all(str path) -> void {
+    str st = fs_stat(path)
+    if (st == "") {
+        if (fs_missing() == 1) {
+            return
+        }
+        fail_on("remove_all", path)
+    }
+    if (st.ends_with(" d")) {
+        for (name in list_dir(path)) {
+            remove_all(path + "/" + name)
+        }
+    }
+    remove(path)
+}
+
+// Set the permission bits of `path` (0o600...).
+@cap(File)
+pub func chmod(str path, int32 mode) -> void {
+    if (fs_chmod(path, mode) < 0) {
+        fail_on("chmod", path)
+    }
+}
+
+// A new empty directory only this user can enter (mode 0700), in $TMPDIR
+// or /tmp, named `<prefix>.XXXXXX`. Its path. Remove it with remove_all.
+@cap(File)
+pub func temp_dir(str prefix) -> str {
+    str d = fs_temp_dir(prefix)
+    if (d == "") {
+        fail_on("temp_dir", prefix)
+    }
+    return d
+}
+
+// Set the umask (the permission bits new files and directories don't
+// get); returns the old one. `set_umask(0o077)` keeps everything private.
+@cap(File)
+pub func set_umask(int32 mask) -> int32 {
+    return fs_set_umask(mask)
+}

@@ -16,7 +16,7 @@
 // `recv` returns "".
 module std.net
 
-import std.convert.{parse_int}
+import std.convert.{parse_int32}
 
 // A listening socket, bound to a port and accepting connections.
 pub struct Listener {
@@ -163,7 +163,7 @@ pub func poll(List[Conn] conns, int32 ms) -> List[int32] {
         return out
     }
     for (part in ready.split(",")) {
-        out.push(parse_int(part))
+        out.push(parse_int32(part) ?? 0)
     }
     return out
 }

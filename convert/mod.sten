@@ -118,6 +118,12 @@ pub func parse_int32(str s) -> int32? {
 // overflow an int32. Replaced by `parse_int32`, which reports both as null.
 @deprecated("use parse_int32 (null for bad input) or parse_int64")
 pub func parse_int(str s) -> int32 {
+    return legacy_parse_int(s)
+}
+
+// The body of the deprecated parse_int and str_to_int (one place, so neither
+// deprecated function calls the other and warns).
+func legacy_parse_int(str s) -> int32 {
     int64 n = s.len()
     int64 i = 0
     bool neg = false
@@ -144,5 +150,5 @@ pub func parse_int(str s) -> int32 {
 // An alias reading well as `str_to_int(s)`.
 @deprecated("use parse_int32 (null for bad input) or parse_int64")
 pub func str_to_int(str s) -> int32 {
-    return parse_int(s)
+    return legacy_parse_int(s)
 }
