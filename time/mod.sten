@@ -1,0 +1,291 @@
+// Stenopos standard library — time module (ADR-0043 §3.3)
+//
+// Clocks, sleeping, and the calendar. Reading the clock and sleeping need no
+// capability (they are not effects on the outside world), but they are not
+// @pure: a @pure function may not call them.
+//
+//   int64 t = unix()                              // seconds since 1970-01-01 UTC
+//   int64 start = mono_ns()                       // for measuring and deadlines
+//   sleep_ms(250)
+//   str a = format_utc(t, "%Y%m%d-%H%M%S")        // 20261109-031500
+//   str b = rfc3339(t)                            // 2026-11-09T03:15:00Z
+//   str c = format_local(t, "%H:%M")              // in the local zone (TZ)
+//
+// Times are int64 seconds since the Unix epoch, so they are exact far past
+// 2038 and before 1970. The calendar is the proleptic Gregorian one, computed
+// here (days-from-civil, after Howard Hinnant), with no locale; only the
+// local zone's offset comes from the C library (TZ and its zone database).
+
+module std.time
+
+// ---------------------------------------------------------------------------
+// Clocks
+// ---------------------------------------------------------------------------
+
+// Seconds since 1970-01-01T00:00:00Z (the wall clock: it can jump when the
+// system clock is set; use mono_ns for measuring).
+pub func unix() -> int64 {
+    return floor_div(clock_unix_ns(), 1000000000)
+}
+
+// Milliseconds since the epoch.
+pub func unix_ms() -> int64 {
+    return floor_div(clock_unix_ns(), 1000000)
+}
+
+// Nanoseconds since the epoch.
+pub func unix_ns() -> int64 {
+    return clock_unix_ns()
+}
+
+// A monotonic clock in nanoseconds: it never goes backwards and is not moved
+// by setting the time. Only differences between two readings mean anything.
+pub func mono_ns() -> int64 {
+    return clock_mono_ns()
+}
+
+// The monotonic clock in milliseconds.
+pub func mono_ms() -> int64 {
+    return clock_mono_ns() / 1000000
+}
+
+// Wait `ms` milliseconds (nothing for 0 or less).
+pub func sleep_ms(int64 ms) -> void {
+    if (ms > 0) {
+        discard sleep_ns(ms * 1000000)
+    }
+}
+
+// Wait `s` seconds.
+pub func sleep_s(int64 s) -> void {
+    if (s > 0) {
+        discard sleep_ns(s * 1000000000)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The calendar
+// ---------------------------------------------------------------------------
+
+// A moment broken into calendar fields, in UTC or a local zone.
+pub struct DateTime {
+    pub int64 year
+    pub int32 month       // 1-12
+    pub int32 day         // 1-31
+    pub int32 hour        // 0-23
+    pub int32 minute      // 0-59
+    pub int32 second      // 0-59
+    pub int32 weekday     // 0 = Sunday ... 6 = Saturday
+    pub int32 yearday     // 1-366
+    pub int32 offset      // seconds east of UTC (0 for UTC)
+}
+
+// Floor division: rounds toward minus infinity, so times before 1970 land
+// on the right day.
+pub func floor_div(int64 a, int64 b) -> int64 {
+    int64 q = a / b
+    if ((a % b != 0) && ((a < 0) != (b < 0))) {
+        q = q - 1
+    }
+    return q
+}
+
+// Days since 1970-01-01 of a calendar date.
+pub func days_from_civil(int64 year, int64 month, int64 day) -> int64 {
+    int64 y = year
+    if (month <= 2) {
+        y = y - 1
+    }
+    int64 era = floor_div(y, 400)
+    int64 yoe = y - era * 400
+    int64 mp = month + 9
+    if (month > 2) {
+        mp = month - 3
+    }
+    int64 doy = (153 * mp + 2) / 5 + day - 1
+    int64 doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
+    return era * 146097 + doe - 719468
+}
+
+// The calendar date of a day number (days since 1970-01-01), as
+// [year, month, day].
+pub func civil_from_days(int64 days) -> List[int64] {
+    int64 z = days + 719468
+    int64 era = floor_div(z, 146097)
+    int64 doe = z - era * 146097
+    int64 yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365
+    int64 doy = doe - (365 * yoe + yoe / 4 - yoe / 100)
+    int64 mp = (5 * doy + 2) / 153
+    int64 d = doy - (153 * mp + 2) / 5 + 1
+    int64 m = mp + 3
+    if (mp >= 10) {
+        m = mp - 9
+    }
+    int64 y = yoe + era * 400
+    if (m <= 2) {
+        y = y + 1
+    }
+    List[int64] out = list_new()
+    out.push(y)
+    out.push(m)
+    out.push(d)
+    return out
+}
+
+// Is `year` a leap year?
+pub func is_leap(int64 year) -> bool {
+    return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+}
+
+// The calendar fields of `t` (Unix seconds) shifted by `offset` seconds.
+pub func at_offset(int64 t, int32 offset) -> DateTime {
+    int64 s = t + cast[int64](offset)
+    int64 days = floor_div(s, 86400)
+    int64 rem = s - days * 86400
+    List[int64] ymd = civil_from_days(days)
+    int64 y = ymd.get(0)
+    int64 jan1 = days_from_civil(y, 1, 1)
+    int64 wd = floor_div(days + 4, 7)
+    wd = days + 4 - wd * 7                 // 1970-01-01 was a Thursday
+    return DateTime {
+        year: y,
+        month: cast[int32](ymd.get(1)),
+        day: cast[int32](ymd.get(2)),
+        hour: cast[int32](rem / 3600),
+        minute: cast[int32]((rem % 3600) / 60),
+        second: cast[int32](rem % 60),
+        weekday: cast[int32](wd),
+        yearday: cast[int32](days - jan1 + 1),
+        offset: offset
+    }
+}
+
+// The calendar fields of `t` in UTC.
+pub func utc(int64 t) -> DateTime {
+    return at_offset(t, 0)
+}
+
+// The calendar fields of `t` in the local zone (TZ, or the system's zone).
+pub func local(int64 t) -> DateTime {
+    return at_offset(t, local_offset(t))
+}
+
+// Unix seconds of a UTC calendar date and time. Out-of-range fields roll
+// over (month 13 is January of the next year; second 60 is the next minute).
+pub func from_utc(int64 year, int64 month, int64 day, int64 hour, int64 minute, int64 second) -> int64 {
+    int64 m0 = month - 1
+    int64 y = year + floor_div(m0, 12)
+    int64 m = m0 - floor_div(m0, 12) * 12 + 1
+    return days_from_civil(y, m, 1) * 86400 + (day - 1) * 86400 + hour * 3600 + minute * 60 + second
+}
+
+// ---------------------------------------------------------------------------
+// Formatting
+// ---------------------------------------------------------------------------
+
+func pad(int64 v, int32 width) -> str {
+    str s = "{v}"
+    bool neg = v < 0
+    if (neg) {
+        s = s.substring(1, s.len())
+    }
+    while (s.len() < cast[int64](width)) {
+        s = "0" + s
+    }
+    if (neg) {
+        s = "-" + s
+    }
+    return s
+}
+
+func weekday_name(int32 w) -> str {
+    List[str] names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    return names.get(cast[int64](w))
+}
+
+func month_name(int32 m) -> str {
+    List[str] names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    return names.get(cast[int64](m - 1))
+}
+
+// The offset as `+hhmm`, or `+hh:mm` with `colon`.
+func offset_text(int32 offset, bool colon) -> str {
+    str sign = "+"
+    int64 o = cast[int64](offset)
+    if (o < 0) {
+        sign = "-"
+        o = 0 - o
+    }
+    str sep = ""
+    if (colon) {
+        sep = ":"
+    }
+    return sign + pad(o / 3600, 2) + sep + pad((o % 3600) / 60, 2)
+}
+
+// `dt` written by `fmt`. Directives: %Y year (at least 4 digits), %m month,
+// %d day, %H hour, %M minute, %S second (2 digits each), %j day of the year
+// (3 digits), %a weekday and %b month (English, 3 letters), %z offset
+// (+hhmm), %% a percent sign. Anything else is copied as written.
+pub func format(DateTime dt, str fmt) -> str {
+    str out = ""
+    int64 i = 0
+    int64 n = fmt.len()
+    while (i < n) {
+        int32 c = fmt.byte_at(i)
+        if (c == '%' && i + 1 < n) {
+            int32 d = fmt.byte_at(i + 1)
+            if (d == 'Y') {
+                out = out + pad(dt.year, 4)
+            } else if (d == 'm') {
+                out = out + pad(cast[int64](dt.month), 2)
+            } else if (d == 'd') {
+                out = out + pad(cast[int64](dt.day), 2)
+            } else if (d == 'H') {
+                out = out + pad(cast[int64](dt.hour), 2)
+            } else if (d == 'M') {
+                out = out + pad(cast[int64](dt.minute), 2)
+            } else if (d == 'S') {
+                out = out + pad(cast[int64](dt.second), 2)
+            } else if (d == 'j') {
+                out = out + pad(cast[int64](dt.yearday), 3)
+            } else if (d == 'a') {
+                out = out + weekday_name(dt.weekday)
+            } else if (d == 'b') {
+                out = out + month_name(dt.month)
+            } else if (d == 'z') {
+                out = out + offset_text(dt.offset, false)
+            } else if (d == '%') {
+                out = out + "%"
+            } else {
+                out = out + fmt.substring(i, i + 2)
+            }
+            i = i + 2
+        } else {
+            out = out + fmt.substring(i, i + 1)
+            i = i + 1
+        }
+    }
+    return out
+}
+
+// `t` in UTC, written by `fmt` (see format).
+pub func format_utc(int64 t, str fmt) -> str {
+    return format(utc(t), fmt)
+}
+
+// `t` in the local zone, written by `fmt` (see format).
+pub func format_local(int64 t, str fmt) -> str {
+    return format(local(t), fmt)
+}
+
+// `t` as RFC 3339 in UTC: 2026-11-09T03:15:00Z.
+pub func rfc3339(int64 t) -> str {
+    return format(utc(t), "%Y-%m-%dT%H:%M:%SZ")
+}
+
+// `t` as RFC 3339 in the local zone: 2026-11-08T21:15:00-06:00.
+pub func rfc3339_local(int64 t) -> str {
+    DateTime dt = local(t)
+    return format(dt, "%Y-%m-%dT%H:%M:%S") + offset_text(dt.offset, true)
+}

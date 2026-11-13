@@ -1,0 +1,113 @@
+module std.time.tests
+
+import std.time.{
+    unix, unix_ms, mono_ns, mono_ms, sleep_ms, utc, local, at_offset, from_utc,
+    format, format_utc, format_local, rfc3339, rfc3339_local, floor_div,
+    days_from_civil, civil_from_days, is_leap, DateTime
+}
+
+func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   " + name)
+        return 0
+    }
+    println("  FAIL " + name)
+    return 1
+}
+
+// One moment: its RFC 3339 text, weekday/month/day-of-year, weekday number,
+// and that from_utc of its fields gives it back. Expected values are from
+// Python's datetime (proleptic Gregorian, UTC).
+func check_moment(int64 t, str iso, str names, int32 wd) -> int32 {
+    int32 fails = 0
+    DateTime d = utc(t)
+    fails += expect(rfc3339(t) == iso, "{t} is " + iso + " (got " + rfc3339(t) + ")")
+    fails += expect(format(d, "%a %b %j") == names, "{t} is " + names)
+    fails += expect(d.weekday == wd, "{t} weekday {wd}")
+    fails += expect(from_utc(d.year, cast[int64](d.month), cast[int64](d.day), cast[int64](d.hour), cast[int64](d.minute), cast[int64](d.second)) == t, "{t} round-trips through from_utc")
+    return fails
+}
+
+func test_calendar() -> int32 {
+    int32 fails = 0
+    fails += check_moment(cast[int64](0), "1970-01-01T00:00:00Z", "Thu Jan 001", 4)
+    fails += check_moment(cast[int64](-1), "1969-12-31T23:59:59Z", "Wed Dec 365", 3)
+    fails += check_moment(cast[int64](951782400), "2000-02-29T00:00:00Z", "Tue Feb 060", 2)
+    fails += check_moment(cast[int64](2147483648), "2038-01-19T03:14:08Z", "Tue Jan 019", 2)
+    fails += check_moment(cast[int64](4102444800), "2100-01-01T00:00:00Z", "Fri Jan 001", 5)
+    fails += check_moment(cast[int64](253402300799), "9999-12-31T23:59:59Z", "Fri Dec 365", 5)
+    fails += check_moment(cast[int64](-62135596800), "0001-01-01T00:00:00Z", "Mon Jan 001", 1)
+    fails += check_moment(cast[int64](1794588331), "2026-11-13T16:45:31Z", "Fri Nov 317", 5)
+    fails += check_moment(cast[int64](-2208988800), "1900-01-01T00:00:00Z", "Mon Jan 001", 1)
+    fails += check_moment(cast[int64](1709164800), "2024-02-29T00:00:00Z", "Thu Feb 060", 4)
+    fails += check_moment(cast[int64](153260660279), "6826-08-21T05:37:59Z", "Fri Aug 233", 5)
+    fails += check_moment(cast[int64](-33570050736), "0906-03-17T17:54:24Z", "Wed Mar 076", 3)
+    fails += check_moment(cast[int64](-8294393557), "1707-03-01T01:47:23Z", "Tue Mar 060", 2)
+    fails += check_moment(cast[int64](56007940085), "3744-10-27T01:08:05Z", "Tue Oct 301", 2)
+    fails += check_moment(cast[int64](-14729913896), "1503-03-25T21:15:04Z", "Wed Mar 084", 3)
+    fails += check_moment(cast[int64](167360163930), "7273-06-06T22:25:30Z", "Tue Jun 157", 2)
+    fails += check_moment(cast[int64](67013448847), "4093-07-27T14:54:07Z", "Mon Jul 208", 1)
+    fails += check_moment(cast[int64](238901723353), "9540-06-30T05:49:13Z", "Sun Jun 182", 0)
+    fails += check_moment(cast[int64](-30247529690), "1011-06-30T20:25:10Z", "Sun Jun 181", 0)
+    fails += check_moment(cast[int64](250653351343), "9912-11-21T10:55:43Z", "Thu Nov 326", 4)
+    fails += check_moment(cast[int64](-28000446807), "1082-09-13T18:06:33Z", "Wed Sep 256", 3)
+    fails += check_moment(cast[int64](-34662063340), "0871-08-08T17:04:20Z", "Sat Aug 220", 6)
+    return fails
+}
+
+func test_helpers() -> int32 {
+    int32 fails = 0
+    fails += expect(floor_div(7, 2) == 3 && floor_div(cast[int64](0 - 7), 2) == cast[int64](0 - 4) && floor_div(cast[int64](0 - 8), 2) == cast[int64](0 - 4), "floor_div rounds toward minus infinity")
+    fails += expect(is_leap(2000) && is_leap(2024) && !is_leap(1900) && !is_leap(2100) && !is_leap(2026), "is_leap")
+    fails += expect(days_from_civil(1970, 1, 1) == 0 && days_from_civil(2000, 3, 1) == 11017, "days_from_civil")
+    List[int64] c = civil_from_days(cast[int64](0 - 1))
+    fails += expect(c.get(0) == 1969 && c.get(1) == 12 && c.get(2) == 31, "civil_from_days(-1) is 1969-12-31")
+    fails += expect(from_utc(2026, 13, 1, 0, 0, 0) == from_utc(2027, 1, 1, 0, 0, 0), "month 13 rolls over to January")
+    fails += expect(from_utc(2026, 11, 9, 3, 15, 60) == from_utc(2026, 11, 9, 3, 16, 0), "second 60 rolls over")
+    return fails
+}
+
+func test_formatting() -> int32 {
+    int32 fails = 0
+    int64 t = from_utc(2026, 11, 9, 3, 15, 0)
+    fails += expect(format_utc(t, "%Y%m%d-%H%M%S") == "20261109-031500", "backup timestamp format")
+    fails += expect(format_utc(t, "100%% at %H:%M, %q stays") == "100% at 03:15, %q stays", "%% and unknown directives")
+    DateTime ist = at_offset(t, 19800)
+    fails += expect(format(ist, "%H:%M %z") == "08:45 +0530", "a +05:30 zone")
+    DateTime cst = at_offset(t, cast[int32](0 - 21600))
+    fails += expect(format(cst, "%Y-%m-%d %H:%M %z") == "2026-11-08 21:15 -0600", "a -06:00 zone crosses midnight")
+    fails += expect(format_utc(cast[int64](0 - 62135596800) - 86400, "%Y") == "0000", "year 0 (1 BC) prints as 0000")
+    return fails
+}
+
+func test_clocks() -> int32 {
+    int32 fails = 0
+    int64 a = mono_ns()
+    sleep_ms(30)
+    int64 b = mono_ns()
+    fails += expect(b - a >= 30000000, "sleep_ms(30) waits at least 30 ms ({(b - a) / 1000000} ms)")
+    fails += expect(b - a < 2000000000, "and not absurdly long")
+    int64 u = unix()
+    fails += expect(u > 1767225600, "unix() is after 2026-01-01")
+    fails += expect(unix_ms() / 1000 - u <= 1, "unix_ms agrees with unix")
+    fails += expect(mono_ms() >= a / 1000000, "mono_ms is the same clock as mono_ns")
+    // Local time is UTC shifted by the zone's offset at that moment.
+    DateTime l = local(u)
+    fails += expect(from_utc(l.year, cast[int64](l.month), cast[int64](l.day), cast[int64](l.hour), cast[int64](l.minute), cast[int64](l.second)) - u == cast[int64](l.offset), "local() is UTC plus its offset")
+    fails += expect(rfc3339_local(u).len() == 25, "rfc3339_local has a +hh:mm offset")
+    fails += expect(format_local(u, "%H") == format(l, "%H"), "format_local uses local()")
+    return fails
+}
+
+func main() -> void {
+    int32 fails = 0
+    println("std.time tests:")
+    fails += test_calendar()
+    fails += test_helpers()
+    fails += test_formatting()
+    fails += test_clocks()
+    if (fails > 0) {
+        fail("FAIL: {fails} check(s) failed")
+    }
+    println("PASS: all std.time checks passed")
+}
