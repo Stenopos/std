@@ -1,58 +1,171 @@
-// Stenopos standard library — net module
-// Blocking TCP sockets, over the compiler's networking builtins (tcp_listen /
-// tcp_accept / tcp_read / tcp_write / tcp_close / tcp_connect). Every function
-// that touches the network declares @cap(Network), so a program's use of the
-// network is visible in its capability set — and a caller must declare the same.
+// Stenopos standard library — net module (ADR-0043 §3.2, §3.4)
 //
-// The socket handles are thin value types wrapping a file descriptor. A negative
-// `fd` signals failure (mirroring the builtins); callers check `l.fd < 0` /
-// `c.fd < 0` rather than catching exceptions.
-
+// TCP connections by name, IPv4 or IPv6, with deadlines. Every function that
+// touches the network declares @cap(Network), so a program's use of the
+// network is visible in its capability set, and a caller must declare it too.
+//
+//   Conn c = connect("mosquitto", 1883)              // a name, IPv4 or IPv6
+//   Conn d = connect_timeout("10.0.0.9", 443, 5000)  // give up after 5 s
+//   str? got = recv_timeout(c, 30000)                // null: nothing within 30 s
+//   List[int32] ready = poll(conns, 1000)            // which have data
+//
+// A failure throws, with the operation, its target and the system's reason:
+// `connect mosquitto:1883: connection refused`, `resolve nas.lan: name not
+// found`, `connect 10.0.0.9:443: timed out after 5000 ms`. (Until rc.7 these
+// returned a handle with `fd < 0`.) The end of a stream is not a failure:
+// `recv` returns "".
 module std.net
+
+import std.convert.{parse_int}
 
 // A listening socket, bound to a port and accepting connections.
 pub struct Listener {
     pub int32 fd
 }
 
-// A live connection to a peer (server-side accepted, or client-side connected).
+// A live connection to a peer (accepted by a server, or connected by a client).
 pub struct Conn {
     pub int32 fd
 }
 
-// Bind and listen on `port` (all interfaces). Check `.fd < 0` for failure.
-@cap(Network)
-pub func listen(int32 port) -> Listener {
-    Listener l = Listener { fd: tcp_listen(port) }
-    return l
+func target(str host, int32 port) -> str {
+    if (host.index_of(":") >= 0) {
+        return "[" + host + "]:{port}"       // an IPv6 address
+    }
+    return host + ":{port}"
 }
 
-// Accept the next incoming connection (blocks until one arrives). The returned
-// Conn's `.fd < 0` on error.
+// The addresses `host` resolves to (IPv4 and IPv6, in the system's
+// preferred order), as text. Throws when the name isn't found.
 @cap(Network)
-pub func accept(Listener l) -> Conn {
-    Conn c = Conn { fd: tcp_accept(l.fd) }
-    return c
+pub func resolve(str host) -> List[str] {
+    str all = net_resolve(host)
+    if (all == "") {
+        throw("resolve " + host + ": " + net_error())
+    }
+    return all.split("\n")
 }
 
-// Connect to `host`:`port` as a client (host is a dotted-quad IPv4 or
-// "localhost"). Check `.fd < 0` for failure.
+// Connect to `host`:`port`: a name, an IPv4 or an IPv6 address. Each address
+// the name resolves to is tried in turn. Throws on failure.
 @cap(Network)
 pub func connect(str host, int32 port) -> Conn {
-    Conn c = Conn { fd: tcp_connect(host, port) }
-    return c
+    int32 fd = tcp_connect(host, port)
+    if (fd < 0) {
+        throw("connect " + target(host, port) + ": " + net_error())
+    }
+    return Conn { fd: fd }
 }
 
-// Read one chunk (up to 64 KiB) from the connection. Returns "" on EOF or error.
+// connect, giving up after `ms` milliseconds across every address tried.
+@cap(Network)
+pub func connect_timeout(str host, int32 port, int32 ms) -> Conn {
+    discard net_set_timeout(ms)
+    int32 fd = tcp_connect(host, port)
+    if (fd < 0) {
+        throw("connect " + target(host, port) + ": " + net_error())
+    }
+    return Conn { fd: fd }
+}
+
+// Listen on `port` on every interface (IPv6 and IPv4). Throws on failure
+// (the port is taken, or below 1024 without privilege).
+@cap(Network)
+pub func listen(int32 port) -> Listener {
+    int32 fd = tcp_listen(port)
+    if (fd < 0) {
+        throw("listen :{port}: " + net_error())
+    }
+    return Listener { fd: fd }
+}
+
+// Listen on one address: "::" (IPv6, and IPv4 where the system maps it),
+// "0.0.0.0" (IPv4), "127.0.0.1", "::1", or an interface's address.
+@cap(Network)
+pub func listen_on(str addr, int32 port) -> Listener {
+    int32 fd = tcp_listen_on(addr, port)
+    if (fd < 0) {
+        throw("listen " + target(addr, port) + ": " + net_error())
+    }
+    return Listener { fd: fd }
+}
+
+// Wait for and accept the next connection. Throws on failure.
+@cap(Network)
+pub func accept(Listener l) -> Conn {
+    int32 fd = tcp_accept(l.fd)
+    if (fd < 0) {
+        throw("accept: " + net_error())
+    }
+    return Conn { fd: fd }
+}
+
+// Read what has arrived (up to 64 KiB), waiting for at least one byte.
+// "" when the peer has closed the connection. Throws on failure.
 @cap(Network)
 pub func recv(Conn c) -> str {
-    return tcp_read(c.fd)
+    str got = tcp_read(c.fd)
+    if (got == "") {
+        str why = net_error()
+        if (why != "") {
+            throw("recv: " + why)
+        }
+    }
+    return got
 }
 
-// Write all of `data` to the connection. Returns the byte count, or -1.
+// recv, waiting at most `ms` milliseconds: null when nothing arrived in
+// time, "" when the peer closed the connection.
+@cap(Network)
+pub func recv_timeout(Conn c, int32 ms) -> str? {
+    int32 r = tcp_wait(c.fd, ms)
+    if (r < 0) {
+        throw("recv: " + net_error())
+    }
+    if (r == 0) {
+        return null
+    }
+    return recv(c)
+}
+
+// Write all of `data`. Returns its length. Throws on failure, including a
+// peer that has closed the connection (never a signal that ends the program).
 @cap(Network)
 pub func send(Conn c, str data) -> int32 {
-    return tcp_write(c.fd, data)
+    int32 n = tcp_write(c.fd, data)
+    if (n < 0) {
+        throw("send: " + net_error())
+    }
+    return n
+}
+
+// Wait up to `ms` milliseconds (a negative `ms`: forever) until any of
+// `conns` has data or has been closed: the indexes of those that have, in
+// order; empty when the time ran out.
+@cap(Network)
+pub func poll(List[Conn] conns, int32 ms) -> List[int32] {
+    str fds = ""
+    int64 i = 0
+    while (i < conns.len()) {
+        if (i > 0) {
+            fds = fds + ","
+        }
+        fds = fds + "{conns.get(i).fd}"
+        i = i + 1
+    }
+    str ready = tcp_poll(fds, ms)
+    List[int32] out = list_new()
+    if (ready == "") {
+        str why = net_error()
+        if (why != "") {
+            throw("poll: " + why)
+        }
+        return out
+    }
+    for (part in ready.split(",")) {
+        out.push(parse_int(part))
+    }
+    return out
 }
 
 // Close a connection. Returns 0 on success.

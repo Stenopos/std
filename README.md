@@ -30,7 +30,7 @@ written in Stenopos itself.
 | `logging` | Leveled logging (TRACE..FATAL) to the console or a file, with component tags | **Implemented + tested** |
 | `testing` | A tiny unit-test framework: expect / expect_eq_* / report | **Implemented + tested** |
 | `assert` | Runtime assertions built on `fail`: assert / assert_eq_* / unreachable | **Implemented + tested** |
-| `net` | Blocking TCP sockets over the networking built-ins | Implemented, **no tests yet** |
+| `net` | TCP by name, IPv4 or IPv6: `connect`, `connect_timeout`, `listen`, `listen_on`, `accept`, `recv`, `recv_timeout`, `send`, `poll`, `resolve`; failures throw with the reason. Needs Syntagma rc.7 | **Implemented + tested** |
 | `http` | Parse an HTTP/1.1 request line, build a response | Implemented, **no tests yet** |
 | `kernel` | Linux kernel-module FFI bindings (printk, uaccess, chrdev, errno) | Designed |
 
@@ -53,6 +53,7 @@ stenopos run io/test_io.sten
 stenopos run testing/test_testing.sten
 stenopos run os/test_os.sten
 stenopos run time/test_time.sten
+stenopos run net/test_net.sten
 stenopos run convert/test_convert.sten
 stenopos run assert/test_assert.sten
 ```

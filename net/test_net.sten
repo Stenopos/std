@@ -1,0 +1,111 @@
+module std.net.tests
+
+// std.net against this machine only: names it can resolve offline
+// (localhost), a refused port, an address that never answers, and a server
+// and client talking over IPv6 loopback.
+import std.net.{Conn, Listener, resolve, connect, connect_timeout, listen_on, accept, recv, recv_timeout, send, poll, close, shutdown}
+
+func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   " + name)
+        return 0
+    }
+    println("  FAIL " + name)
+    return 1
+}
+
+// The message `f` throws, or "" if it doesn't.
+@cap(Network)
+func error_of_resolve(str host) -> str {
+    try {
+        discard resolve(host)
+    } catch (str e) {
+        return e
+    }
+    return ""
+}
+
+@cap(Network)
+func error_of_connect(str host, int32 port, int32 ms) -> str {
+    try {
+        Conn c = connect_timeout(host, port, ms)
+        discard close(c)
+    } catch (str e) {
+        return e
+    }
+    return ""
+}
+
+@cap(Network)
+func test_errors() -> int32 {
+    int32 fails = 0
+    List[str] lh = resolve("localhost")
+    fails += expect(lh.len() >= 1, "localhost resolves (" + lh.get(0) + ")")
+    fails += expect(resolve("::1").get(0) == "::1", "an IPv6 address resolves to itself")
+    str bad = error_of_resolve("no-such-host.invalid")
+    fails += expect(bad == "resolve no-such-host.invalid: name not found" || bad == "resolve no-such-host.invalid: name lookup failed, try again", "an unknown name throws: " + bad)
+    str refused = error_of_connect("127.0.0.1", 1, 2000)
+    fails += expect(refused == "connect 127.0.0.1:1: connection refused", "a closed port throws: " + refused)
+    str slow = error_of_connect("10.255.255.1", 81, 300)
+    fails += expect(slow == "connect 10.255.255.1:81: timed out after 300 ms" || slow.index_of("unreachable") >= 0, "no answer throws after the deadline: " + slow)
+    str v6 = error_of_connect("::1", 1, 2000)
+    fails += expect(v6.starts_with("connect [::1]:1: "), "IPv6 targets are bracketed: " + v6)
+    return fails
+}
+
+@cap(Network)
+func test_conversation() -> int32 {
+    int32 fails = 0
+    // IPv6 loopback where the system has it (CI containers often don't).
+    str host = "::1"
+    Listener l = Listener { fd: 0 - 1 }
+    try {
+        l = listen_on("::1", 47124)
+    } catch (str e) {
+        host = "127.0.0.1"
+        l = listen_on(host, 47124)
+    }
+    println("  (over " + host + ")")
+    Conn client = connect(host, 47124)
+    Conn server = accept(l)
+    str? nothing = recv_timeout(server, 50)
+    fails += expect(nothing == null, "recv_timeout is null when nothing arrives")
+    List[Conn] both = [client, server]
+    fails += expect(poll(both, 30).len() == 0, "poll times out with nothing ready")
+    discard send(client, "PINGREQ")
+    List[int32] ready = poll(both, 1000)
+    fails += expect(ready.len() == 1 && ready.get(0) == 1, "poll names the connection with data")
+    str? got = recv_timeout(server, 1000)
+    fails += expect((got ?? "(null)") == "PINGREQ", "the server receives what the client sent")
+    discard send(server, "PINGRESP")
+    fails += expect(recv(client) == "PINGRESP", "and the client the reply")
+    discard close(client)
+    fails += expect(recv(server) == "", "recv is \"\" once the peer has closed")
+    // Writing into a connection the peer closed: an error, not a signal.
+    str broke = ""
+    try {
+        int32 i = 0
+        while (i < 50) {
+            discard send(server, "x")
+            i = i + 1
+        }
+    } catch (str e) {
+        broke = e
+    }
+    fails += expect(broke.starts_with("send: "), "send to a closed peer throws (" + broke + ") and the program goes on")
+    discard close(server)
+    discard shutdown(l)
+    return fails
+}
+
+@cap(Network)
+func main() -> void {
+    int32 fails = 0
+    println("std.net tests:")
+    fails += test_errors()
+    fails += test_conversation()
+    if (fails > 0) {
+        fail("FAIL: {fails} check(s) failed")
+    }
+    println("PASS: all std.net checks passed")
+}
