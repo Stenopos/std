@@ -1,7 +1,9 @@
+/// TODO: what this module is for.
 module std.fmt.tests
 
 import std.fmt.{to_hex, to_binary, to_octal, repeat_str, pad_left, pad_right, zero_pad, with_thousands}
 
+/// TODO: what `expect` does.
 func expect(bool cond, str name) -> int32 {
     if (cond) {
         println("  ok   {name}")
@@ -11,6 +13,7 @@ func expect(bool cond, str name) -> int32 {
     return 1
 }
 
+/// TODO: what `expect_str` does.
 func expect_str(str got, str want, str name) -> int32 {
     if (got == want) {
         return expect(true, name)
@@ -19,6 +22,7 @@ func expect_str(str got, str want, str name) -> int32 {
     return 1
 }
 
+/// TODO: what `test_radix` does.
 func test_radix() -> int32 {
     int32 fails = 0
     fails += expect_str(to_hex(255), "ff", "to_hex 255")
@@ -32,6 +36,7 @@ func test_radix() -> int32 {
     return fails
 }
 
+/// TODO: what `test_pad_repeat` does.
 func test_pad_repeat() -> int32 {
     int32 fails = 0
     fails += expect_str(repeat_str("ab", 3), "ababab", "repeat_str ab x3")
@@ -44,6 +49,7 @@ func test_pad_repeat() -> int32 {
     return fails
 }
 
+/// TODO: what `test_thousands` does.
 func test_thousands() -> int32 {
     int32 fails = 0
     fails += expect_str(with_thousands(cast[int64](1234567)), "1,234,567", "thousands 1234567")
@@ -54,6 +60,7 @@ func test_thousands() -> int32 {
     return fails
 }
 
+/// TODO: what `main` does.
 func main() -> void {
     int32 fails = 0
     println("std.fmt tests:")

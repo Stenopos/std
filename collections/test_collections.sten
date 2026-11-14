@@ -1,13 +1,13 @@
-// Tests for std.collections — run with:
-//   stenopos-cli run std/collections/test_collections.sten
-// Prints one ok/FAIL line per check and a PASS/FAIL summary.
-
+/// Tests for std.collections — run with:
+///   stenopos-cli run std/collections/test_collections.sten
+/// Prints one ok/FAIL line per check and a PASS/FAIL summary.
 module std.collections.tests
 
 import std.collections.{range, repeat_i32, concat_i32, slice_i32}
 import std.collections.{sum_i32, sum_i64, sum_f64, min_of_i32, max_of_i32, min_of_f64, max_of_f64}
 import std.collections.{count_i32, count_str}
 
+/// TODO: what `expect` does.
 func expect(bool cond, str name) -> int32 {
     if (cond) {
         println("  ok   {name}")
@@ -17,6 +17,7 @@ func expect(bool cond, str name) -> int32 {
     return 1
 }
 
+/// TODO: what `near` does.
 func near(float64 a, float64 b) -> bool {
     float64 d = a - b
     if (d < 0.0) {
@@ -25,6 +26,7 @@ func near(float64 a, float64 b) -> bool {
     return d < 0.000001
 }
 
+/// TODO: what `test_building` does.
 func test_building() -> int32 {
     int32 fails = 0
     List[int32] r = range(2, 5)
@@ -54,6 +56,7 @@ func test_building() -> int32 {
     return fails
 }
 
+/// TODO: what `test_aggregation` does.
 func test_aggregation() -> int32 {
     int32 fails = 0
     List[int32] xs = range(1, 5)
@@ -92,6 +95,7 @@ func test_aggregation() -> int32 {
     return fails
 }
 
+/// TODO: what `test_counting` does.
 func test_counting() -> int32 {
     int32 fails = 0
     List[int32] xs = list_new()
@@ -111,6 +115,7 @@ func test_counting() -> int32 {
     return fails
 }
 
+/// TODO: what `main` does.
 func main() -> void {
     int32 fails = 0
     println("std.collections tests:")

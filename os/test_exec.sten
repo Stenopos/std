@@ -1,10 +1,10 @@
-// std.os exec and signals: a program run without a shell, its output,
-// environment, directory and input, and a signal delivered to this program.
-
+/// std.os exec and signals: a program run without a shell, its output,
+/// environment, directory and input, and a signal delivered to this program.
 module std.os.exec_tests
 
 import std.os.{Output, ExecOptions, execute, execute_with, environ, watch_signals, wait_signal, SIGTERM, SIGHUP}
 
+/// TODO: what `expect` does.
 func expect(bool cond, str name) -> int32 {
     if (cond) {
         println("  ok   " + name)
@@ -14,10 +14,10 @@ func expect(bool cond, str name) -> int32 {
     return 1
 }
 
-// The message execute throws, or "exit 127" when the program "ran" and
-// exited 127: under valgrind (and with some C libraries) posix_spawn can't
-// report that the program wasn't found, so the child exits 127, the shell's
-// "command not found" status.
+/// The message execute throws, or "exit 127" when the program "ran" and
+/// exited 127: under valgrind (and with some C libraries) posix_spawn can't
+/// report that the program wasn't found, so the child exits 127, the shell's
+/// "command not found" status.
 @cap(Process)
 func error_of_exec(List[str] argv) -> str {
     try {
@@ -31,6 +31,7 @@ func error_of_exec(List[str] argv) -> str {
     return ""
 }
 
+/// TODO: what `main` does.
 @cap(Process)
 func main() -> void {
     int32 fails = 0

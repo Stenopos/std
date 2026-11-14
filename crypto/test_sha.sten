@@ -1,13 +1,13 @@
-// Tests for std.crypto.sha256 and std.crypto.sha512. Expected digests come
-// from an independent implementation (Python's hashlib), for messages on both
-// sides of every padding boundary; the "abc" vectors are FIPS 180-4's.
-
+/// Tests for std.crypto.sha256 and std.crypto.sha512. Expected digests come
+/// from an independent implementation (Python's hashlib), for messages on both
+/// sides of every padding boundary; the "abc" vectors are FIPS 180-4's.
 module std.crypto.sha_tests
 
 import std.crypto.sha256.{sha256, sha256_str}
 import std.crypto.sha512.{sha512, sha512_str}
 import std.hex.{hex_encode}
 
+/// TODO: what `expect_hex` does.
 func expect_hex(List[int32] got, str want, str name) -> int32 {
     str g = hex_encode(got)
     if (g == want) {
@@ -18,7 +18,7 @@ func expect_hex(List[int32] got, str want, str name) -> int32 {
     return 1
 }
 
-// The test message of `n` bytes: byte i is (i * 31 + 7) % 256.
+/// The test message of `n` bytes: byte i is (i * 31 + 7) % 256.
 func msg(int32 n) -> List[int32] {
     List[int32] b = list_new()
     int32 i = 0
@@ -29,6 +29,7 @@ func msg(int32 n) -> List[int32] {
     return b
 }
 
+/// TODO: what `main` does.
 func main() -> void {
     int32 fails = 0
     println("std.crypto sha tests:")

@@ -1,22 +1,23 @@
-// Stenopos standard library — json module
-// A JSON value tree, parser, and serializer. Pure Stenopos, no FFI.
-//
-// A JSON value is a payload enum:
-//   JNull                 — null
-//   JBool(bool)           — true / false
-//   JNum(int64)           — a number (INTEGERS only; JSON floats are not
-//                           supported yet — the subset has no float parser)
-//   JStr(str)             — a string
-//   JArr(List[Json])      — an array
-//   JObj(List[Json])      — an object, stored as a flat list of alternating
-//                           key (JStr) and value entries (k0,v0,k1,v1,...)
-//
-// Security note: parsed strings and numbers come from untrusted input — treat a
-// `parse` result as `@tainted`. Parsing is not validation; check values before
-// use.
-
+/// Stenopos standard library — json module
+/// A JSON value tree, parser, and serializer. Pure Stenopos, no FFI.
+///
+/// A JSON value is a payload enum:
+///   JNull                 — null
+///   JBool(bool)           — true / false
+///   JNum(int64)           — a number (INTEGERS only; JSON floats are not
+///                           supported yet — the subset has no float parser)
+///   JStr(str)             — a string
+///   JArr(List[Json])      — an array
+///   JObj(List[Json])      — an object, stored as a flat list of alternating
+///                           key (JStr) and value entries (k0,v0,k1,v1,...)
+///
+/// Security note: parsed strings and numbers come from untrusted input — treat a
+/// `parse` result as `@tainted`. Parsing is not validation; check values before
+/// use.
 module std.json
 
+/// A JSON value: null, a boolean, an integer, a string, an array (its
+/// elements), or an object (alternating key strings and values).
 pub enum Json : int32 {
     JNull
     JBool(bool)
@@ -30,15 +31,19 @@ pub enum Json : int32 {
 // Constructors (convenience — value semantics, each returns a fresh value)
 // ---------------------------------------------------------------------------
 
+/// The JSON `null`.
 pub func json_null() -> Json {
     return Json.JNull
 }
+/// A JSON boolean.
 pub func json_bool(bool b) -> Json {
     return Json.JBool(b)
 }
+/// A JSON number (an integer).
 pub func json_num(int64 n) -> Json {
     return Json.JNum(n)
 }
+/// A JSON string.
 pub func json_str(str s) -> Json {
     return Json.JStr(s)
 }
@@ -47,7 +52,7 @@ pub func json_str(str s) -> Json {
 // Serialization
 // ---------------------------------------------------------------------------
 
-// Escape a string's special characters for JSON output.
+/// Escape a string's special characters for JSON output.
 func escape(str s) -> str {
     List[str] parts = list_new()
     parts.push("\"")
@@ -74,7 +79,7 @@ func escape(str s) -> str {
     return parts.join()
 }
 
-// "true"/"false" for a JSON boolean.
+/// "true"/"false" for a JSON boolean.
 func bool_text(bool b) -> str {
     if (b) {
         return "true"
@@ -82,7 +87,7 @@ func bool_text(bool b) -> str {
     return "false"
 }
 
-// Render `v` as compact JSON text.
+/// Render `v` as compact JSON text.
 pub func serialize(Json v) -> str {
     match (v) {
         case Json.JNull: return "null"
@@ -95,6 +100,7 @@ pub func serialize(Json v) -> str {
     return "null"
 }
 
+/// TODO: what `serialize_arr` does.
 func serialize_arr(List[Json] items) -> str {
     List[str] parts = list_new()
     parts.push("[")
@@ -111,6 +117,7 @@ func serialize_arr(List[Json] items) -> str {
     return parts.join()
 }
 
+/// TODO: what `serialize_obj` does.
 func serialize_obj(List[Json] entries) -> str {
     List[str] parts = list_new()
     parts.push("\{")
@@ -135,6 +142,7 @@ func serialize_obj(List[Json] entries) -> str {
 // and read/written via get/set carries the position without globals.
 // ---------------------------------------------------------------------------
 
+/// TODO: what `peek` does.
 func peek(str s, List[int32] pos) -> int32 {
     int32 p = pos.get(0)
     if (cast[int64](p) >= s.len()) {
@@ -143,10 +151,12 @@ func peek(str s, List[int32] pos) -> int32 {
     return s.byte_at(cast[int64](p))
 }
 
+/// TODO: what `advance` does.
 func advance(List[int32] pos) -> void {
     pos.set(0, pos.get(0) + 1)
 }
 
+/// TODO: what `skip_ws` does.
 func skip_ws(str s, List[int32] pos) -> void {
     bool go = true
     while (go) {
@@ -159,7 +169,7 @@ func skip_ws(str s, List[int32] pos) -> void {
     }
 }
 
-// Parse a JSON document. Throws on malformed input.
+/// Parse a JSON document. Throws on malformed input.
 pub func parse(str s) -> Json {
     List[int32] pos = list_new()
     pos.push(0)
@@ -172,6 +182,7 @@ pub func parse(str s) -> Json {
     return v
 }
 
+/// TODO: what `parse_value` does.
 func parse_value(str s, List[int32] pos) -> Json {
     skip_ws(s, pos)
     int32 c = peek(s, pos)
@@ -196,6 +207,7 @@ func parse_value(str s, List[int32] pos) -> Json {
     throw("json.parse: unexpected character")
 }
 
+/// TODO: what `expect_char` does.
 func expect_char(str s, List[int32] pos, int32 want, str name) -> void {
     if (peek(s, pos) != want) {
         throw("json.parse: expected {name}")
@@ -203,6 +215,7 @@ func expect_char(str s, List[int32] pos, int32 want, str name) -> void {
     advance(pos)
 }
 
+/// TODO: what `parse_string` does.
 func parse_string(str s, List[int32] pos) -> str {
     expect_char(s, pos, 34, "opening quote")
     List[str] parts = list_new()
@@ -243,6 +256,7 @@ func parse_string(str s, List[int32] pos) -> str {
     return parts.join()
 }
 
+/// TODO: what `parse_number` does.
 func parse_number(str s, List[int32] pos) -> Json {
     bool neg = false
     if (peek(s, pos) == 45) {          // '-'
@@ -274,6 +288,7 @@ func parse_number(str s, List[int32] pos) -> Json {
     return Json.JNum(val)
 }
 
+/// TODO: what `parse_bool` does.
 func parse_bool(str s, List[int32] pos) -> Json {
     if (peek(s, pos) == 116) {         // 't'
         expect_char(s, pos, 116, "true")
@@ -290,6 +305,7 @@ func parse_bool(str s, List[int32] pos) -> Json {
     return Json.JBool(false)
 }
 
+/// TODO: what `parse_null` does.
 func parse_null(str s, List[int32] pos) -> Json {
     expect_char(s, pos, 110, "null")
     expect_char(s, pos, 117, "null")
@@ -298,6 +314,7 @@ func parse_null(str s, List[int32] pos) -> Json {
     return Json.JNull
 }
 
+/// TODO: what `parse_array` does.
 func parse_array(str s, List[int32] pos) -> Json {
     expect_char(s, pos, 91, "'['")
     List[Json] items = list_new()
@@ -323,6 +340,7 @@ func parse_array(str s, List[int32] pos) -> Json {
     return Json.JArr(items)
 }
 
+/// TODO: what `parse_object` does.
 func parse_object(str s, List[int32] pos) -> Json {
     expect_char(s, pos, 123, "'\{'")
     List[Json] entries = list_new()

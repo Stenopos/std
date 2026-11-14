@@ -1,7 +1,9 @@
+/// TODO: what this module is for.
 module std.toml.tests
 
 import std.toml.{Toml, parse_toml, toml_key, TOML_STRING, TOML_INT, TOML_TABLE, TOML_ARRAY, TOML_TABLES}
 
+/// TODO: what `expect` does.
 func expect(bool cond, str name) -> int32 {
     if (cond) {
         println("  ok   {name}")
@@ -11,6 +13,7 @@ func expect(bool cond, str name) -> int32 {
     return 1
 }
 
+/// TODO: what `expect_str` does.
 func expect_str(str got, str want, str name) -> int32 {
     if (got == want) {
         return expect(true, name)
@@ -19,17 +22,17 @@ func expect_str(str got, str want, str name) -> int32 {
     return 1
 }
 
-// The string at `path`, or "<none>".
+/// The string at `path`, or "<none>".
 func str_at(Toml t, str path) -> str {
     return t.get_str(path) ?? "<none>"
 }
 
-// The integer at `path`, or -1.
+/// The integer at `path`, or -1.
 func int_at(Toml t, str path) -> int64 {
     return t.get_int(path) ?? -1
 }
 
-// The boolean at `path` as 1/0, or -1 when absent.
+/// The boolean at `path` as 1/0, or -1 when absent.
 func bool_at(Toml t, str path) -> int32 {
     bool? b = t.get_bool(path)
     if (b == null) {
@@ -41,7 +44,7 @@ func bool_at(Toml t, str path) -> int32 {
     return 0
 }
 
-// A document that must read without error.
+/// A document that must read without error.
 func ok_doc(str src, str name) -> Toml {
     Toml t = parse_toml(src)
     if (t.error != "") {
@@ -50,7 +53,7 @@ func ok_doc(str src, str name) -> Toml {
     return t
 }
 
-// A document that must fail with an error containing `want`.
+/// A document that must fail with an error containing `want`.
 func expect_error(str src, str want, str name) -> int32 {
     Toml t = parse_toml(src)
     if (t.error.index_of(want) >= 0) {
@@ -60,6 +63,7 @@ func expect_error(str src, str want, str name) -> int32 {
     return 1
 }
 
+/// TODO: what `test_scalars` does.
 func test_scalars() -> int32 {
     println("scalars")
     Toml t = ok_doc("# a comment\nname = \"json\"   # trailing\nlit = 'C:\\path'\nn = -42\nbig = 9_223_372_036_854_775_807\nyes = true\nno = false\n", "scalars read")
@@ -77,6 +81,7 @@ func test_scalars() -> int32 {
     return f
 }
 
+/// TODO: what `test_escapes` does.
 func test_escapes() -> int32 {
     println("escapes")
     Toml t = ok_doc("s = \"a\\tb\\n\\\"q\\\"\\\\ \\u0041\"\n", "escapes read")
@@ -91,6 +96,7 @@ func test_escapes() -> int32 {
     return f
 }
 
+/// TODO: what `test_tables` does.
 func test_tables() -> int32 {
     println("tables")
     Toml t = ok_doc("top = 1\n[package]\nname = \"x\"\n[package.meta]\nowner = \"o\"\n[dependencies]\njson = \{ package = \"stenopos/json\", version = \"1.2\", caps = [] \}\nutil = \{ path = \"../util\" \}\n", "tables read")
@@ -107,6 +113,7 @@ func test_tables() -> int32 {
     return f
 }
 
+/// TODO: what `test_dotted_and_quoted` does.
 func test_dotted_and_quoted() -> int32 {
     println("dotted and quoted keys")
     Toml t = ok_doc("a.b.c = 1\n\"stenopos/json\" = \"1.2\"\n\"x.y\" = 2\n", "keys read")
@@ -119,6 +126,7 @@ func test_dotted_and_quoted() -> int32 {
     return f
 }
 
+/// TODO: what `test_arrays` does.
 func test_arrays() -> int32 {
     println("arrays")
     Toml t = ok_doc("caps = [\n  \"File\",   # reads its input\n  \"Network\",\n]\nnums = [1, 2, 3]\nnested = [[1], [2, 3]]\n", "arrays read")
@@ -131,6 +139,7 @@ func test_arrays() -> int32 {
     return f
 }
 
+/// TODO: what `test_array_of_tables` does.
 func test_array_of_tables() -> int32 {
     println("arrays of tables")
     Toml t = ok_doc("name = \"json\"\n[[version]]\nversion = \"1.0.0\"\n[version.deps]\nx = \"1\"\n[[version]]\nversion = \"1.1.0\"\nyanked = true\n", "array of tables read")
@@ -142,6 +151,7 @@ func test_array_of_tables() -> int32 {
     return f
 }
 
+/// TODO: what `test_errors` does.
 func test_errors() -> int32 {
     println("errors")
     int32 f = 0
@@ -164,6 +174,7 @@ func test_errors() -> int32 {
     return f
 }
 
+/// TODO: what `main` does.
 func main() -> int32 {
     int32 failed = test_scalars() + test_escapes() + test_tables() + test_dotted_and_quoted() + test_arrays() + test_array_of_tables() + test_errors()
     if (failed == 0) {

@@ -1,7 +1,9 @@
+/// TODO: what this module is for.
 module std.json.tests
 
 import std.json.{Json, parse, serialize, json_num, json_str, json_bool, json_null}
 
+/// TODO: what `expect` does.
 func expect(bool cond, str name) -> int32 {
     if (cond) {
         println("  ok   {name}")
@@ -11,6 +13,7 @@ func expect(bool cond, str name) -> int32 {
     return 1
 }
 
+/// TODO: what `expect_str` does.
 func expect_str(str got, str want, str name) -> int32 {
     if (got == want) {
         return expect(true, name)
@@ -19,11 +22,12 @@ func expect_str(str got, str want, str name) -> int32 {
     return 1
 }
 
-// Round-trip: parse then serialize should reproduce the (compact) input.
+/// Round-trip: parse then serialize should reproduce the (compact) input.
 func roundtrip(str input, str name) -> int32 {
     return expect_str(serialize(parse(input)), input, name)
 }
 
+/// TODO: what `test_scalars` does.
 func test_scalars() -> int32 {
     int32 fails = 0
     fails += roundtrip("null", "null")
@@ -36,6 +40,7 @@ func test_scalars() -> int32 {
     return fails
 }
 
+/// TODO: what `test_containers` does.
 func test_containers() -> int32 {
     int32 fails = 0
     fails += roundtrip("[1,2,3]", "array of ints")
@@ -48,6 +53,7 @@ func test_containers() -> int32 {
     return fails
 }
 
+/// TODO: what `test_whitespace_and_escape` does.
 func test_whitespace_and_escape() -> int32 {
     int32 fails = 0
     // Whitespace is skipped; the serialized form is compact.
@@ -57,6 +63,7 @@ func test_whitespace_and_escape() -> int32 {
     return fails
 }
 
+/// TODO: what `test_constructors` does.
 func test_constructors() -> int32 {
     int32 fails = 0
     fails += expect_str(serialize(json_num(5)), "5", "json_num")
@@ -66,6 +73,7 @@ func test_constructors() -> int32 {
     return fails
 }
 
+/// TODO: what `test_errors` does.
 func test_errors() -> int32 {
     int32 fails = 0
     int32 caught = 0
@@ -88,6 +96,7 @@ func test_errors() -> int32 {
     return fails
 }
 
+/// TODO: what `main` does.
 func main() -> void {
     int32 fails = 0
     println("std.json tests:")

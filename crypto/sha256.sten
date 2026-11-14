@@ -1,12 +1,12 @@
-// Stenopos standard library — SHA256 (FIPS 180-4).
-// Pure Stenopos, no FFI. A byte buffer is a List[int32] of values 0..255 (as in
-// std.bytes). The constants are the fractional parts of the cube roots (K) and
-// square roots (H0) of the first primes; tests check digests against FIPS 180
-// vectors. Not constant-time with respect to the message length, which is
-// public; the data itself only flows through fixed-time operations.
-
+/// Stenopos standard library — SHA256 (FIPS 180-4).
+/// Pure Stenopos, no FFI. A byte buffer is a List[int32] of values 0..255 (as in
+/// std.bytes). The constants are the fractional parts of the cube roots (K) and
+/// square roots (H0) of the first primes; tests check digests against FIPS 180
+/// vectors. Not constant-time with respect to the message length, which is
+/// public; the data itself only flows through fixed-time operations.
 module std.crypto.sha256
 
+/// TODO: what `round_constants` does.
 func round_constants() -> List[uint32] {
     List[uint32] t = list_new()
     t.push(0x428a2f98)
@@ -76,6 +76,7 @@ func round_constants() -> List[uint32] {
     return t
 }
 
+/// TODO: what `initial_hash` does.
 func initial_hash() -> List[uint32] {
     List[uint32] t = list_new()
     t.push(0x6a09e667)
@@ -89,12 +90,13 @@ func initial_hash() -> List[uint32] {
     return t
 }
 
+/// TODO: what `rotr` does.
 func rotr(uint32 x, uint32 n) -> uint32 {
     return (x >> n) | (x << (32 - n))
 }
 
-// The message padded to a whole number of 64-byte blocks: a 0x80 byte,
-// zeros, then the length in bits as a 64-bit big-endian integer.
+/// The message padded to a whole number of 64-byte blocks: a 0x80 byte,
+/// zeros, then the length in bits as a 64-bit big-endian integer.
 func pad(List[int32] msg) -> List[int32] {
     List[int32] out = list_new()
     for (b in msg) {
@@ -118,7 +120,7 @@ func pad(List[int32] msg) -> List[int32] {
     return out
 }
 
-// Word `j` of the padded message, big-endian.
+/// Word `j` of the padded message, big-endian.
 func word_at(List[int32] p, int64 j) -> uint32 {
     uint32 w = 0
     int64 k = 0
@@ -129,7 +131,7 @@ func word_at(List[int32] p, int64 j) -> uint32 {
     return w
 }
 
-// The SHA256 digest of `msg`: 8 bytes.
+/// The SHA256 digest of `msg`: 8 bytes.
 pub func sha256(List[int32] msg) -> List[int32] {
     List[uint32] kk = round_constants()
     List[uint32] h = initial_hash()
@@ -198,7 +200,7 @@ pub func sha256(List[int32] msg) -> List[int32] {
     return out
 }
 
-// The digest of a string's bytes.
+/// The digest of a string's bytes.
 pub func sha256_str(str s) -> List[int32] {
     List[int32] b = list_new()
     int64 i = 0

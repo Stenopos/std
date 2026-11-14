@@ -1,13 +1,12 @@
-// Stenopos standard library — os module
-// Running programs without a shell (execute, execute_with), signals
-// (watch_signals, wait_signal, or into a channel: notify_signals), exit, exit_grace, the shell when you need it (run), and the
-// arguments the program was started with.
-//
-//   import std.os.{run, argc, arg, args, program_name}
-//
-// `run` shells out to a command and returns its exit code; the argv helpers
-// expose the arguments the program was launched with.
-
+/// Stenopos standard library — os module
+/// Running programs without a shell (execute, execute_with), signals
+/// (watch_signals, wait_signal, or into a channel: notify_signals), exit, exit_grace, the shell when you need it (run), and the
+/// arguments the program was started with.
+///
+///   import std.os.{run, argc, arg, args, program_name}
+///
+/// `run` shells out to a command and returns its exit code; the argv helpers
+/// expose the arguments the program was launched with.
 module std.os
 
 import std.convert.{parse_int32, parse_int64}
@@ -16,22 +15,23 @@ import std.convert.{parse_int32, parse_int64}
 // Running programs (ADR-0043 §3.6)
 // ---------------------------------------------------------------------------
 
-// What a program printed and how it ended.
+/// What a program printed and how it ended.
 pub struct Output {
     pub int32 code       // its exit status; 128 + N when signal N ended it
     pub str stdout
     pub str stderr
 }
 
-// How to run a program: its environment (KEY=VALUE entries; empty means
-// nothing is inherited, see environ()), its working directory ("" = this
-// one) and what to feed its standard input.
+/// How to run a program: its environment (KEY=VALUE entries; empty means
+/// nothing is inherited, see environ()), its working directory ("" = this
+/// one) and what to feed its standard input.
 pub struct ExecOptions {
     pub List[str] env
     pub str dir
     pub str stdin
 }
 
+/// TODO: what `nul_join` does.
 func nul_join(List[str] parts) -> str {
     str z = str_from_byte(0)
     str out = ""
@@ -41,20 +41,20 @@ func nul_join(List[str] parts) -> str {
     return out
 }
 
-// Run a program with its arguments as given: no shell, so nothing in them
-// is split, expanded or interpreted (`execute(["tar", "-czf", out, dir])` is
-// safe whatever `out` and `dir` hold). The program is looked up on PATH;
-// it gets an empty environment and empty standard input. Waits for it and
-// returns its output and exit status; a non-zero status is not an error.
-// Throws only when it can't be started (`exec tar: no such file or
-// directory`). (Named execute: the `exec` built-in is the shell path.)
+/// Run a program with its arguments as given: no shell, so nothing in them
+/// is split, expanded or interpreted (`execute(["tar", "-czf", out, dir])` is
+/// safe whatever `out` and `dir` hold). The program is looked up on PATH;
+/// it gets an empty environment and empty standard input. Waits for it and
+/// returns its output and exit status; a non-zero status is not an error.
+/// Throws only when it can't be started (`exec tar: no such file or
+/// directory`). (Named execute: the `exec` built-in is the shell path.)
 @cap(Process)
 pub func execute(List[str] argv) -> Output {
     List[str] none = list_new()
     return execute_with(argv, ExecOptions { env: none, dir: "", stdin: "" })
 }
 
-// execute with an environment, a working directory and standard input.
+/// execute with an environment, a working directory and standard input.
 @cap(Process)
 pub func execute_with(List[str] argv, ExecOptions opts) -> Output {
     str prog = ""
@@ -76,8 +76,8 @@ pub func execute_with(List[str] argv, ExecOptions opts) -> Output {
     }
 }
 
-// This program's own environment, as KEY=VALUE entries: pass it (or part
-// of it) to execute_with when a child should inherit it.
+/// This program's own environment, as KEY=VALUE entries: pass it (or part
+/// of it) to execute_with when a child should inherit it.
 @cap(Process)
 pub func environ() -> List[str] {
     str all = os_environ()
@@ -103,9 +103,9 @@ pub const int32 SIGINT = 2
 pub const int32 SIGQUIT = 3
 pub const int32 SIGTERM = 15
 
-// Deliver `sigs` to wait_signal instead of their default action (which, for
-// SIGTERM, ends the program at once). Kubernetes sends SIGTERM and waits 30 s
-// before SIGKILL: watch it, finish what you are doing, then exit.
+/// Deliver `sigs` to wait_signal instead of their default action (which, for
+/// SIGTERM, ends the program at once). Kubernetes sends SIGTERM and waits 30 s
+/// before SIGKILL: watch it, finish what you are doing, then exit.
 @cap(Process)
 pub func watch_signals(List[int32] sigs) -> void {
     str list = ""
@@ -120,8 +120,8 @@ pub func watch_signals(List[int32] sigs) -> void {
     }
 }
 
-// The next watched signal, waiting up to `ms` milliseconds (negative:
-// forever); null when none arrived in time.
+/// The next watched signal, waiting up to `ms` milliseconds (negative:
+/// forever); null when none arrived in time.
 @cap(Process)
 pub func wait_signal(int32 ms) -> int32? {
     int32 s = sig_wait(ms)
@@ -134,21 +134,21 @@ pub func wait_signal(int32 ms) -> int32? {
     return s
 }
 
-// Deliver `sigs` into `into` as they arrive, so a service's main loop can
-// wait for its work and for SIGTERM together:
-//
-//   chan[int32] sigs = chan()
-//   notify_signals([SIGTERM, SIGINT], sigs)
-//   while (running) {
-//       ...                                    // the service's work
-//       int32? s = sigs.recv_timeout(1000)     // or try_recv
-//       if (s != null) { running = false }
-//   }
-//
-// The runtime forwards them (no Hemerodrome waits forever, so nothing holds
-// up the exit), and stops when `into` is freed. Calling it again watches
-// more signals and moves forwarding to the new channel. Once it is in use,
-// read signals from the channel, not with wait_signal.
+/// Deliver `sigs` into `into` as they arrive, so a service's main loop can
+/// wait for its work and for SIGTERM together:
+///
+///   chan[int32] sigs = chan()
+///   notify_signals([SIGTERM, SIGINT], sigs)
+///   while (running) {
+///       ...                                    // the service's work
+///       int32? s = sigs.recv_timeout(1000)     // or try_recv
+///       if (s != null) { running = false }
+///   }
+///
+/// The runtime forwards them (no Hemerodrome waits forever, so nothing holds
+/// up the exit), and stops when `into` is freed. Calling it again watches
+/// more signals and moves forwarding to the new channel. Once it is in use,
+/// read signals from the channel, not with wait_signal.
 @cap(Process)
 pub func notify_signals(List[int32] sigs, chan[int32] into) -> void {
     watch_signals(sigs)
@@ -157,19 +157,19 @@ pub func notify_signals(List[int32] sigs, chan[int32] into) -> void {
     }
 }
 
-// How long a program may wait for its tasks after main returns: past `ms`
-// milliseconds, it says which wait ran out and exits with code 124 (as
-// `timeout` does), cleaning up as exit() does. Unset, main's return waits
-// for every task, however long: work a program started is finished, never
-// cut off. A service under Kubernetes might set 25000 (SIGKILL comes 30 s
-// after SIGTERM); a batch job leaves it unset.
+/// How long a program may wait for its tasks after main returns: past `ms`
+/// milliseconds, it says which wait ran out and exits with code 124 (as
+/// `timeout` does), cleaning up as exit() does. Unset, main's return waits
+/// for every task, however long: work a program started is finished, never
+/// cut off. A service under Kubernetes might set 25000 (SIGKILL comes 30 s
+/// after SIGTERM); a batch job leaves it unset.
 pub func exit_grace(int32 ms) -> void {
     discard os_exit_grace(ms)
 }
 
-// Exit now with `code` (0 success), after flushing what was printed. Tasks
-// still waiting (an accept loop, a reader) don't hold the exit up, so a
-// service can finish its work on SIGTERM and then call exit(0).
+/// Exit now with `code` (0 success), after flushing what was printed. Tasks
+/// still waiting (an accept loop, a reader) don't hold the exit up, so a
+/// service can finish its work on SIGTERM and then call exit(0).
 pub func exit(int32 code) -> void {
     discard os_exit(code)
 }
@@ -178,28 +178,28 @@ pub func exit(int32 code) -> void {
 // The shell, and this program's arguments
 // ---------------------------------------------------------------------------
 
-// Run a shell command; returns its exit code (127 if it could not be run).
-// The command is passed to the system shell, so redirection and pipes work,
-// and so does anything an attacker can put in it: prefer execute, which takes
-// the arguments as a list and runs no shell.
+/// Run a shell command; returns its exit code (127 if it could not be run).
+/// The command is passed to the system shell, so redirection and pipes work,
+/// and so does anything an attacker can put in it: prefer execute, which takes
+/// the arguments as a list and runs no shell.
 @cap(Process)
 pub func run(str command) -> int32 {
     return exec(command)
 }
 
-// Run a command and return true iff it exited 0 (succeeded).
+/// Run a command and return true iff it exited 0 (succeeded).
 @cap(Process)
 pub func run_ok(str command) -> bool {
     return exec(command) == 0
 }
 
-// The number of command-line arguments, including the program name at index 0.
+/// The number of command-line arguments, including the program name at index 0.
 pub func argc() -> int32 {
     return arg_count()
 }
 
-// The argument at `index` (0 = the program name). Out-of-range indices return
-// an empty string rather than aborting, so callers can probe optional args.
+/// The argument at `index` (0 = the program name). Out-of-range indices return
+/// an empty string rather than aborting, so callers can probe optional args.
 pub func arg_at(int32 index) -> str {
     if (index < 0 || index >= arg_count()) {
         return ""
@@ -207,13 +207,13 @@ pub func arg_at(int32 index) -> str {
     return arg(index)
 }
 
-// The program name (argv[0]), or "" if somehow unavailable.
+/// The program name (argv[0]), or "" if somehow unavailable.
 pub func program_name() -> str {
     return arg_at(0)
 }
 
-// All arguments AFTER the program name, in order, as a List[str]. Empty when
-// the program was launched with no extra arguments.
+/// All arguments AFTER the program name, in order, as a List[str]. Empty when
+/// the program was launched with no extra arguments.
 pub func args() -> List[str] {
     List[str] out = list_new()
     int32 n = arg_count()
@@ -225,8 +225,8 @@ pub func args() -> List[str] {
     return out
 }
 
-// True when the flag `name` (matched exactly) appears among the arguments —
-// e.g. `has_flag("--verbose")`.
+/// True when the flag `name` (matched exactly) appears among the arguments —
+/// e.g. `has_flag("--verbose")`.
 pub func has_flag(str name) -> bool {
     int32 n = arg_count()
     int32 i = 1

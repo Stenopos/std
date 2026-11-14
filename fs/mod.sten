@@ -1,28 +1,28 @@
-// Stenopos standard library — fs module (ADR-0043 §3.7)
-//
-// Files and directories, without a shell. Every function declares
-// @cap(File).
-//
-//   List[str] names = list_dir("/backups")        // sorted, no . or ..
-//   FileInfo i = stat(path)                       // size, mtime, mode, kind
-//   str? text = read(path)                        // null: no such file
-//   write_atomic(path, text)                      // never a half-written file
-//   append(log, line + "\n")                      // one write, never rewrites
-//   mkdir_all(dir, 0o700)
-//   rename(a, b); remove(path); remove_all(dir); chmod(path, 0o600)
-//   str tmp = temp_dir("backup")                  // mode 0700
-//   int32 old = set_umask(0o077)
-//
-// A failure throws, naming the operation, the path and the system's reason:
-// `read /etc/shadow: permission denied`, `mkdir_all /data/x: no space left
-// on device`. A missing file is not a failure for `read` (null) and
-// `remove_all` (nothing to do), only for the rest.
+/// Stenopos standard library — fs module (ADR-0043 §3.7)
+///
+/// Files and directories, without a shell. Every function declares
+/// @cap(File).
+///
+///   List[str] names = list_dir("/backups")        // sorted, no . or ..
+///   FileInfo i = stat(path)                       // size, mtime, mode, kind
+///   str? text = read(path)                        // null: no such file
+///   write_atomic(path, text)                      // never a half-written file
+///   append(log, line + "\n")                      // one write, never rewrites
+///   mkdir_all(dir, 0o700)
+///   rename(a, b); remove(path); remove_all(dir); chmod(path, 0o600)
+///   str tmp = temp_dir("backup")                  // mode 0700
+///   int32 old = set_umask(0o077)
+///
+/// A failure throws, naming the operation, the path and the system's reason:
+/// `read /etc/shadow: permission denied`, `mkdir_all /data/x: no space left
+/// on device`. A missing file is not a failure for `read` (null) and
+/// `remove_all` (nothing to do), only for the rest.
 module std.fs
 
 import std.convert.{parse_int32, parse_int64}
 
-// What `stat` reports about a path. A symbolic link is described itself,
-// not followed.
+/// What `stat` reports about a path. A symbolic link is described itself,
+/// not followed.
 pub struct FileInfo {
     pub int64 size       // bytes
     pub int64 mtime      // last modified, Unix seconds
@@ -32,13 +32,14 @@ pub struct FileInfo {
     pub bool is_link
 }
 
+/// TODO: what `fail_on` does.
 @cap(File)
 func fail_on(str op, str path) -> void {
     throw(op + " " + path + ": " + fs_error())
 }
 
-// The contents of `path`, or null when it doesn't exist. Throws for any
-// other failure (a directory, no permission...).
+/// The contents of `path`, or null when it doesn't exist. Throws for any
+/// other failure (a directory, no permission...).
 @cap(File)
 pub func read(str path) -> str? {
     str text = fs_read(path)
@@ -51,10 +52,10 @@ pub func read(str path) -> str? {
     return text
 }
 
-// Write `text` to `path` so that a reader (or a crash) sees the old
-// contents or the new, never part of either: a temporary file beside it,
-// flushed to disk, renamed over it. A new file gets 0666 less the umask;
-// an existing one keeps its permissions.
+/// Write `text` to `path` so that a reader (or a crash) sees the old
+/// contents or the new, never part of either: a temporary file beside it,
+/// flushed to disk, renamed over it. A new file gets 0666 less the umask;
+/// an existing one keeps its permissions.
 @cap(File)
 pub func write_atomic(str path, str text) -> void {
     if (fs_write_atomic(path, text, 0 - 1) < 0) {
@@ -62,7 +63,7 @@ pub func write_atomic(str path, str text) -> void {
     }
 }
 
-// write_atomic with the file's permissions set to `mode` (0o600...).
+/// write_atomic with the file's permissions set to `mode` (0o600...).
 @cap(File)
 pub func write_atomic_mode(str path, str text, int32 mode) -> void {
     if (fs_write_atomic(path, text, mode) < 0) {
@@ -70,7 +71,7 @@ pub func write_atomic_mode(str path, str text, int32 mode) -> void {
     }
 }
 
-// The names in directory `dir`, sorted, without . and ..
+/// The names in directory `dir`, sorted, without . and ..
 @cap(File)
 pub func list_dir(str dir) -> List[str] {
     str all = fs_list_dir(dir)
@@ -84,8 +85,8 @@ pub func list_dir(str dir) -> List[str] {
     return all.split("\n")
 }
 
-// What kind of thing `path` is, its size, modification time and mode.
-// Throws when it doesn't exist (see exists).
+/// What kind of thing `path` is, its size, modification time and mode.
+/// Throws when it doesn't exist (see exists).
 @cap(File)
 pub func stat(str path) -> FileInfo {
     str st = fs_stat(path)
@@ -104,7 +105,7 @@ pub func stat(str path) -> FileInfo {
     }
 }
 
-// Does `path` exist (a link counts, even a dangling one)?
+/// Does `path` exist (a link counts, even a dangling one)?
 @cap(File)
 pub func exists(str path) -> bool {
     if (fs_stat(path) != "") {
@@ -117,8 +118,8 @@ pub func exists(str path) -> bool {
     return false
 }
 
-// Make directory `dir` and any missing parents, each with `mode`. Nothing
-// to do if it exists already.
+/// Make directory `dir` and any missing parents, each with `mode`. Nothing
+/// to do if it exists already.
 @cap(File)
 pub func mkdir_all(str dir, int32 mode) -> void {
     if (fs_mkdir_all(dir, mode) < 0) {
@@ -126,9 +127,9 @@ pub func mkdir_all(str dir, int32 mode) -> void {
     }
 }
 
-// Append `text` to `path`, creating it if needed (0666 less the umask), in
-// one write: two writers each land whole, and a growing log costs only what
-// is added.
+/// Append `text` to `path`, creating it if needed (0666 less the umask), in
+/// one write: two writers each land whole, and a growing log costs only what
+/// is added.
 @cap(File)
 pub func append(str path, str text) -> void {
     if (fs_append(path, text) < 0) {
@@ -136,7 +137,7 @@ pub func append(str path, str text) -> void {
     }
 }
 
-// Rename `from` to `to`, replacing `to`: atomic within one filesystem.
+/// Rename `from` to `to`, replacing `to`: atomic within one filesystem.
 @cap(File)
 pub func rename(str from, str to) -> void {
     if (fs_rename(from, to) < 0) {
@@ -144,7 +145,7 @@ pub func rename(str from, str to) -> void {
     }
 }
 
-// Remove a file, a link, or an empty directory.
+/// Remove a file, a link, or an empty directory.
 @cap(File)
 pub func remove(str path) -> void {
     if (fs_remove(path) < 0) {
@@ -152,8 +153,8 @@ pub func remove(str path) -> void {
     }
 }
 
-// Remove `path` and, if it is a directory, everything in it. Links are
-// removed, not followed. Nothing to do if it doesn't exist.
+/// Remove `path` and, if it is a directory, everything in it. Links are
+/// removed, not followed. Nothing to do if it doesn't exist.
 @cap(File)
 pub func remove_all(str path) -> void {
     str st = fs_stat(path)
@@ -171,7 +172,7 @@ pub func remove_all(str path) -> void {
     remove(path)
 }
 
-// Set the permission bits of `path` (0o600...).
+/// Set the permission bits of `path` (0o600...).
 @cap(File)
 pub func chmod(str path, int32 mode) -> void {
     if (fs_chmod(path, mode) < 0) {
@@ -179,8 +180,8 @@ pub func chmod(str path, int32 mode) -> void {
     }
 }
 
-// A new empty directory only this user can enter (mode 0700), in $TMPDIR
-// or /tmp, named `<prefix>.XXXXXX`. Its path. Remove it with remove_all.
+/// A new empty directory only this user can enter (mode 0700), in $TMPDIR
+/// or /tmp, named `<prefix>.XXXXXX`. Its path. Remove it with remove_all.
 @cap(File)
 pub func temp_dir(str prefix) -> str {
     str d = fs_temp_dir(prefix)
@@ -190,8 +191,8 @@ pub func temp_dir(str prefix) -> str {
     return d
 }
 
-// Set the umask (the permission bits new files and directories don't
-// get); returns the old one. `set_umask(0o077)` keeps everything private.
+/// Set the umask (the permission bits new files and directories don't
+/// get); returns the old one. `set_umask(0o077)` keeps everything private.
 @cap(File)
 pub func set_umask(int32 mask) -> int32 {
     return fs_set_umask(mask)

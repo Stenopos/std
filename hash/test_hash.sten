@@ -1,7 +1,9 @@
+/// TODO: what this module is for.
 module std.hash.tests
 
 import std.hash.{fnv1a_32_str, fnv1a_32_bytes, djb2_str, crc32_str, crc32_bytes}
 
+/// TODO: what `expect` does.
 func expect(bool cond, str name) -> int32 {
     if (cond) {
         println("  ok   {name}")
@@ -11,6 +13,7 @@ func expect(bool cond, str name) -> int32 {
     return 1
 }
 
+/// TODO: what `expect_eq` does.
 func expect_eq(int64 got, int64 want, str name) -> int32 {
     if (got == want) {
         return expect(true, name)
@@ -19,6 +22,7 @@ func expect_eq(int64 got, int64 want, str name) -> int32 {
     return 1
 }
 
+/// TODO: what `bytes_of` does.
 func bytes_of(str s) -> List[int32] {
     List[int32] b = list_new()
     int64 i = 0
@@ -30,6 +34,7 @@ func bytes_of(str s) -> List[int32] {
     return b
 }
 
+/// TODO: what `test_fnv` does.
 func test_fnv() -> int32 {
     int32 fails = 0
     // FNV-1a-32 of the empty string is the offset basis.
@@ -43,6 +48,7 @@ func test_fnv() -> int32 {
     return fails
 }
 
+/// TODO: what `test_crc32` does.
 func test_crc32() -> int32 {
     int32 fails = 0
     fails += expect_eq(crc32_str(""), 0, "crc32 empty = 0")
@@ -53,6 +59,7 @@ func test_crc32() -> int32 {
     return fails
 }
 
+/// TODO: what `test_determinism` does.
 func test_determinism() -> int32 {
     int32 fails = 0
     fails += expect(fnv1a_32_str("hello") == fnv1a_32_str("hello"), "fnv deterministic")
@@ -61,6 +68,7 @@ func test_determinism() -> int32 {
     return fails
 }
 
+/// TODO: what `main` does.
 func main() -> void {
     int32 fails = 0
     println("std.hash tests:")

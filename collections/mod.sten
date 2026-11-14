@@ -1,19 +1,18 @@
-// Stenopos standard library — collections module
-// Helpers over the built-in List[T] and HashMap[str, V].
-//
-// The language has no lambdas yet, so map/filter/fold are deferred; these are
-// the concrete-typed helpers everyday code reaches for. Names carry a type
-// suffix (sum_i32, ...) because functions cannot be overloaded yet.
-
+/// Stenopos standard library — collections module
+/// Helpers over the built-in List[T] and HashMap[str, V].
+///
+/// The language has no lambdas yet, so map/filter/fold are deferred; these are
+/// the concrete-typed helpers everyday code reaches for. Names carry a type
+/// suffix (sum_i32, ...) because functions cannot be overloaded yet.
 module std.collections
 
 // ---------------------------------------------------------------------------
 // Building lists
 // ---------------------------------------------------------------------------
 
-// The integers from lo (inclusive) to hi (exclusive), in order.
-// range(2, 5) -> [2, 3, 4]; range(5, 5) -> []. Length is hi - lo.
-// (Half-open on purpose: the language's own `a..b` range is inclusive.)
+/// The integers from lo (inclusive) to hi (exclusive), in order.
+/// range(2, 5) -> [2, 3, 4]; range(5, 5) -> []. Length is hi - lo.
+/// (Half-open on purpose: the language's own `a..b` range is inclusive.)
 pub func range(int32 lo, int32 hi) -> List[int32] {
     List[int32] out = list_new()
     int32 i = lo
@@ -24,7 +23,7 @@ pub func range(int32 lo, int32 hi) -> List[int32] {
     return out
 }
 
-// A list holding `value` repeated `n` times. n <= 0 yields [].
+/// A list holding `value` repeated `n` times. n <= 0 yields [].
 pub func repeat_i32(int32 value, int32 n) -> List[int32] {
     List[int32] out = list_new()
     int32 i = 0
@@ -35,7 +34,7 @@ pub func repeat_i32(int32 value, int32 n) -> List[int32] {
     return out
 }
 
-// A new list holding all of `a` then all of `b`.
+/// A new list holding all of `a` then all of `b`.
 pub func concat_i32(List[int32] a, List[int32] b) -> List[int32] {
     List[int32] out = list_new()
     for (x in a) {
@@ -47,8 +46,8 @@ pub func concat_i32(List[int32] a, List[int32] b) -> List[int32] {
     return out
 }
 
-// Copy of xs[lo..hi) (half-open). Bounds are clamped to the list, so
-// slice_i32(xs, 0, 999) is just a copy of xs.
+/// Copy of xs[lo..hi) (half-open). Bounds are clamped to the list, so
+/// slice_i32(xs, 0, 999) is just a copy of xs.
 pub func slice_i32(List[int32] xs, int64 lo, int64 hi) -> List[int32] {
     List[int32] out = list_new()
     int64 n = xs.len()
@@ -70,7 +69,7 @@ pub func slice_i32(List[int32] xs, int64 lo, int64 hi) -> List[int32] {
 // Aggregation
 // ---------------------------------------------------------------------------
 
-// Sum of an int32 list. Empty list sums to 0.
+/// Sum of an int32 list. Empty list sums to 0.
 pub func sum_i32(List[int32] xs) -> int32 {
     int32 total = 0
     for (x in xs) {
@@ -79,7 +78,7 @@ pub func sum_i32(List[int32] xs) -> int32 {
     return total
 }
 
-// Sum of an int64 list. Empty list sums to 0.
+/// Sum of an int64 list. Empty list sums to 0.
 pub func sum_i64(List[int64] xs) -> int64 {
     int64 total = 0
     for (x in xs) {
@@ -88,7 +87,7 @@ pub func sum_i64(List[int64] xs) -> int64 {
     return total
 }
 
-// Sum of a float64 list. Empty list sums to 0.0.
+/// Sum of a float64 list. Empty list sums to 0.0.
 pub func sum_f64(List[float64] xs) -> float64 {
     float64 total = 0.0
     for (x in xs) {
@@ -97,7 +96,7 @@ pub func sum_f64(List[float64] xs) -> float64 {
     return total
 }
 
-// Smallest value in an int32 list. Throws on an empty list.
+/// Smallest value in an int32 list. Throws on an empty list.
 pub func min_of_i32(List[int32] xs) -> int32 {
     if (xs.len() == 0) {
         throw("min_of_i32: empty list")
@@ -111,7 +110,7 @@ pub func min_of_i32(List[int32] xs) -> int32 {
     return best
 }
 
-// Largest value in an int32 list. Throws on an empty list.
+/// Largest value in an int32 list. Throws on an empty list.
 pub func max_of_i32(List[int32] xs) -> int32 {
     if (xs.len() == 0) {
         throw("max_of_i32: empty list")
@@ -125,7 +124,7 @@ pub func max_of_i32(List[int32] xs) -> int32 {
     return best
 }
 
-// Smallest value in a float64 list. Throws on an empty list.
+/// Smallest value in a float64 list. Throws on an empty list.
 pub func min_of_f64(List[float64] xs) -> float64 {
     if (xs.len() == 0) {
         throw("min_of_f64: empty list")
@@ -139,7 +138,7 @@ pub func min_of_f64(List[float64] xs) -> float64 {
     return best
 }
 
-// Largest value in a float64 list. Throws on an empty list.
+/// Largest value in a float64 list. Throws on an empty list.
 pub func max_of_f64(List[float64] xs) -> float64 {
     if (xs.len() == 0) {
         throw("max_of_f64: empty list")
@@ -157,7 +156,7 @@ pub func max_of_f64(List[float64] xs) -> float64 {
 // Counting
 // ---------------------------------------------------------------------------
 
-// How many elements of xs equal `value`.
+/// How many elements of xs equal `value`.
 pub func count_i32(List[int32] xs, int32 value) -> int32 {
     int32 hits = 0
     for (x in xs) {
@@ -168,7 +167,7 @@ pub func count_i32(List[int32] xs, int32 value) -> int32 {
     return hits
 }
 
-// How many elements of xs equal `value` (string comparison by content).
+/// How many elements of xs equal `value` (string comparison by content).
 pub func count_str(List[str] xs, str value) -> int32 {
     int32 hits = 0
     for (x in xs) {

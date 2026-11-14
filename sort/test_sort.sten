@@ -1,7 +1,9 @@
+/// TODO: what this module is for.
 module std.sort.tests
 
 import std.sort.{sort_i32, sort_i64, sort_str, binary_search_i32, is_sorted_i32, is_sorted_str}
 
+/// TODO: what `expect` does.
 func expect(bool cond, str name) -> int32 {
     if (cond) {
         println("  ok   {name}")
@@ -11,6 +13,7 @@ func expect(bool cond, str name) -> int32 {
     return 1
 }
 
+/// TODO: what `li32` does.
 func li32(int32 a, int32 b, int32 c, int32 d, int32 e) -> List[int32] {
     List[int32] xs = list_new()
     xs.push(a)
@@ -21,6 +24,7 @@ func li32(int32 a, int32 b, int32 c, int32 d, int32 e) -> List[int32] {
     return xs
 }
 
+/// TODO: what `eq5` does.
 func eq5(List[int32] xs, int32 a, int32 b, int32 c, int32 d, int32 e) -> bool {
     if (xs.len() != 5) {
         return false
@@ -28,6 +32,7 @@ func eq5(List[int32] xs, int32 a, int32 b, int32 c, int32 d, int32 e) -> bool {
     return xs.get(0) == a && xs.get(1) == b && xs.get(2) == c && xs.get(3) == d && xs.get(4) == e
 }
 
+/// TODO: what `test_sort_i32` does.
 func test_sort_i32() -> int32 {
     int32 fails = 0
     List[int32] input = li32(3, 1, 4, 1, 5)
@@ -41,6 +46,7 @@ func test_sort_i32() -> int32 {
     return fails
 }
 
+/// TODO: what `test_sort_i64` does.
 func test_sort_i64() -> int32 {
     int32 fails = 0
     List[int64] xs = list_new()
@@ -53,6 +59,7 @@ func test_sort_i64() -> int32 {
     return fails
 }
 
+/// TODO: what `test_sort_str` does.
 func test_sort_str() -> int32 {
     int32 fails = 0
     List[str] xs = list_new()
@@ -66,6 +73,7 @@ func test_sort_str() -> int32 {
     return fails
 }
 
+/// TODO: what `test_binary_search` does.
 func test_binary_search() -> int32 {
     int32 fails = 0
     List[int32] xs = sort_i32(li32(3, 1, 4, 1, 5))
@@ -76,6 +84,7 @@ func test_binary_search() -> int32 {
     return fails
 }
 
+/// TODO: what `main` does.
 func main() -> void {
     int32 fails = 0
     println("std.sort tests:")

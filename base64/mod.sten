@@ -1,28 +1,28 @@
-// Stenopos standard library — base64 module
-// Standard base64 (RFC 4648, `+`/`/` alphabet, `=` padding) encoding and
-// decoding for byte buffers. Pure Stenopos, no FFI.
-// A byte buffer is `List[int32]` with each element in 0..255.
-//
-// The 6-bit grouping is done with plain integer arithmetic (multiply /
-// divide / modulo) rather than shifts and masks, to avoid mixed-type
-// bitwise operands in the self-hosted compiler's subset.
-
+/// Stenopos standard library — base64 module
+/// Standard base64 (RFC 4648, `+`/`/` alphabet, `=` padding) encoding and
+/// decoding for byte buffers. Pure Stenopos, no FFI.
+/// A byte buffer is `List[int32]` with each element in 0..255.
+///
+/// The 6-bit grouping is done with plain integer arithmetic (multiply /
+/// divide / modulo) rather than shifts and masks, to avoid mixed-type
+/// bitwise operands in the self-hosted compiler's subset.
 module std.base64
 
-// Not exported: only used internally to map a 6-bit group (0..63) to its
-// base64 character, and back.
+/// Not exported: only used internally to map a 6-bit group (0..63) to its
+/// base64 character, and back.
 func b64_alphabet() -> str {
     return "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 }
 
+/// TODO: what `b64_char` does.
 func b64_char(int64 six_bits) -> str {
     str alphabet = b64_alphabet()
     return alphabet.substring(six_bits, six_bits + 1)
 }
 
-// Map a base64 alphabet character's byte code to its 6-bit value (0..63).
-// Throws on anything that isn't A-Z, a-z, 0-9, `+`, or `/` (callers handle
-// `=` padding themselves before calling this).
+/// Map a base64 alphabet character's byte code to its 6-bit value (0..63).
+/// Throws on anything that isn't A-Z, a-z, 0-9, `+`, or `/` (callers handle
+/// `=` padding themselves before calling this).
 func b64_value(int32 c) -> int32 {
     int32 v = 0 - 1
     if (c >= 'A' && c <= 'Z') {
@@ -41,9 +41,9 @@ func b64_value(int32 c) -> int32 {
     return v
 }
 
-// Encode a byte buffer as standard base64 text, padded with `=` to a
-// multiple of 4 characters (e.g. "Man" -> "TWFu", "Ma" -> "TWE=",
-// "M" -> "TQ=="). An empty list encodes to "".
+/// Encode a byte buffer as standard base64 text, padded with `=` to a
+/// multiple of 4 characters (e.g. "Man" -> "TWFu", "Ma" -> "TWE=",
+/// "M" -> "TQ=="). An empty list encodes to "".
 pub func base64_encode(List[int32] bytes) -> str {
     int64 n = bytes.len()
     str out = ""
@@ -78,16 +78,16 @@ pub func base64_encode(List[int32] bytes) -> str {
     return out
 }
 
-// Decode standard base64 text (with `=` padding) back to its byte buffer.
-// The input length must be a multiple of 4, `=` may only appear as trailing
-// padding in the final 4-character group, and every non-padding character
-// must be in the base64 alphabet; throws("...") otherwise.
-//
-// Security note: this function does not interpret or sanitize the decoded
-// bytes — if the input `str` is `@tainted`, the resulting `List[int32]`
-// carries the same taint forward (decoding is not a sanitizer). Callers that
-// need trusted bytes must sanitize/validate downstream, not rely on
-// base64_decode to have done it.
+/// Decode standard base64 text (with `=` padding) back to its byte buffer.
+/// The input length must be a multiple of 4, `=` may only appear as trailing
+/// padding in the final 4-character group, and every non-padding character
+/// must be in the base64 alphabet; throws("...") otherwise.
+///
+/// Security note: this function does not interpret or sanitize the decoded
+/// bytes — if the input `str` is `@tainted`, the resulting `List[int32]`
+/// carries the same taint forward (decoding is not a sanitizer). Callers that
+/// need trusted bytes must sanitize/validate downstream, not rely on
+/// base64_decode to have done it.
 pub func base64_decode(str s) -> List[int32] {
     int64 n = s.len()
     if (n % 4 != 0) {

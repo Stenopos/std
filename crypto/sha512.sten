@@ -1,12 +1,12 @@
-// Stenopos standard library — SHA512 (FIPS 180-4).
-// Pure Stenopos, no FFI. A byte buffer is a List[int32] of values 0..255 (as in
-// std.bytes). The constants are the fractional parts of the cube roots (K) and
-// square roots (H0) of the first primes; tests check digests against FIPS 180
-// vectors. Not constant-time with respect to the message length, which is
-// public; the data itself only flows through fixed-time operations.
-
+/// Stenopos standard library — SHA512 (FIPS 180-4).
+/// Pure Stenopos, no FFI. A byte buffer is a List[int32] of values 0..255 (as in
+/// std.bytes). The constants are the fractional parts of the cube roots (K) and
+/// square roots (H0) of the first primes; tests check digests against FIPS 180
+/// vectors. Not constant-time with respect to the message length, which is
+/// public; the data itself only flows through fixed-time operations.
 module std.crypto.sha512
 
+/// TODO: what `round_constants` does.
 func round_constants() -> List[uint64] {
     List[uint64] t = list_new()
     t.push(0x428a2f98_d728ae22)
@@ -92,6 +92,7 @@ func round_constants() -> List[uint64] {
     return t
 }
 
+/// TODO: what `initial_hash` does.
 func initial_hash() -> List[uint64] {
     List[uint64] t = list_new()
     t.push(0x6a09e667_f3bcc908)
@@ -105,12 +106,13 @@ func initial_hash() -> List[uint64] {
     return t
 }
 
+/// TODO: what `rotr` does.
 func rotr(uint64 x, uint64 n) -> uint64 {
     return (x >> n) | (x << (64 - n))
 }
 
-// The message padded to a whole number of 128-byte blocks: a 0x80 byte,
-// zeros, then the length in bits as a 128-bit big-endian integer.
+/// The message padded to a whole number of 128-byte blocks: a 0x80 byte,
+/// zeros, then the length in bits as a 128-bit big-endian integer.
 func pad(List[int32] msg) -> List[int32] {
     List[int32] out = list_new()
     for (b in msg) {
@@ -134,7 +136,7 @@ func pad(List[int32] msg) -> List[int32] {
     return out
 }
 
-// Word `j` of the padded message, big-endian.
+/// Word `j` of the padded message, big-endian.
 func word_at(List[int32] p, int64 j) -> uint64 {
     uint64 w = 0
     int64 k = 0
@@ -145,7 +147,7 @@ func word_at(List[int32] p, int64 j) -> uint64 {
     return w
 }
 
-// The SHA512 digest of `msg`: 16 bytes.
+/// The SHA512 digest of `msg`: 16 bytes.
 pub func sha512(List[int32] msg) -> List[int32] {
     List[uint64] kk = round_constants()
     List[uint64] h = initial_hash()
@@ -214,7 +216,7 @@ pub func sha512(List[int32] msg) -> List[int32] {
     return out
 }
 
-// The digest of a string's bytes.
+/// The digest of a string's bytes.
 pub func sha512_str(str s) -> List[int32] {
     List[int32] b = list_new()
     int64 i = 0

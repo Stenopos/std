@@ -1,33 +1,34 @@
-// Stenopos standard library — net module (ADR-0043 §3.2, §3.4)
-//
-// TCP connections by name, IPv4 or IPv6, with deadlines. Every function that
-// touches the network declares @cap(Network), so a program's use of the
-// network is visible in its capability set, and a caller must declare it too.
-//
-//   Conn c = connect("mosquitto", 1883)              // a name, IPv4 or IPv6
-//   Conn d = connect_timeout("10.0.0.9", 443, 5000)  // give up after 5 s
-//   str? got = recv_timeout(c, 30000)                // null: nothing within 30 s
-//   List[int32] ready = poll(conns, 1000)            // which have data
-//
-// A failure throws, with the operation, its target and the system's reason:
-// `connect mosquitto:1883: connection refused`, `resolve nas.lan: name not
-// found`, `connect 10.0.0.9:443: timed out after 5000 ms`. (Until rc.7 these
-// returned a handle with `fd < 0`.) The end of a stream is not a failure:
-// `recv` returns "".
+/// Stenopos standard library — net module (ADR-0043 §3.2, §3.4)
+///
+/// TCP connections by name, IPv4 or IPv6, with deadlines. Every function that
+/// touches the network declares @cap(Network), so a program's use of the
+/// network is visible in its capability set, and a caller must declare it too.
+///
+///   Conn c = connect("mosquitto", 1883)              // a name, IPv4 or IPv6
+///   Conn d = connect_timeout("10.0.0.9", 443, 5000)  // give up after 5 s
+///   str? got = recv_timeout(c, 30000)                // null: nothing within 30 s
+///   List[int32] ready = poll(conns, 1000)            // which have data
+///
+/// A failure throws, with the operation, its target and the system's reason:
+/// `connect mosquitto:1883: connection refused`, `resolve nas.lan: name not
+/// found`, `connect 10.0.0.9:443: timed out after 5000 ms`. (Until rc.7 these
+/// returned a handle with `fd < 0`.) The end of a stream is not a failure:
+/// `recv` returns "".
 module std.net
 
 import std.convert.{parse_int32}
 
-// A listening socket, bound to a port and accepting connections.
+/// A listening socket, bound to a port and accepting connections.
 pub struct Listener {
     pub int32 fd
 }
 
-// A live connection to a peer (accepted by a server, or connected by a client).
+/// A live connection to a peer (accepted by a server, or connected by a client).
 pub struct Conn {
     pub int32 fd
 }
 
+/// TODO: what `target` does.
 func target(str host, int32 port) -> str {
     if (host.index_of(":") >= 0) {
         return "[" + host + "]:{port}"       // an IPv6 address
@@ -35,8 +36,8 @@ func target(str host, int32 port) -> str {
     return host + ":{port}"
 }
 
-// The addresses `host` resolves to (IPv4 and IPv6, in the system's
-// preferred order), as text. Throws when the name isn't found.
+/// The addresses `host` resolves to (IPv4 and IPv6, in the system's
+/// preferred order), as text. Throws when the name isn't found.
 @cap(Network)
 pub func resolve(str host) -> List[str] {
     str all = net_resolve(host)
@@ -46,8 +47,8 @@ pub func resolve(str host) -> List[str] {
     return all.split("\n")
 }
 
-// Connect to `host`:`port`: a name, an IPv4 or an IPv6 address. Each address
-// the name resolves to is tried in turn. Throws on failure.
+/// Connect to `host`:`port`: a name, an IPv4 or an IPv6 address. Each address
+/// the name resolves to is tried in turn. Throws on failure.
 @cap(Network)
 pub func connect(str host, int32 port) -> Conn {
     int32 fd = tcp_connect(host, port)
@@ -57,7 +58,7 @@ pub func connect(str host, int32 port) -> Conn {
     return Conn { fd: fd }
 }
 
-// connect, giving up after `ms` milliseconds across every address tried.
+/// connect, giving up after `ms` milliseconds across every address tried.
 @cap(Network)
 pub func connect_timeout(str host, int32 port, int32 ms) -> Conn {
     discard net_set_timeout(ms)
@@ -68,8 +69,8 @@ pub func connect_timeout(str host, int32 port, int32 ms) -> Conn {
     return Conn { fd: fd }
 }
 
-// Listen on `port` on every interface (IPv6 and IPv4). Throws on failure
-// (the port is taken, or below 1024 without privilege).
+/// Listen on `port` on every interface (IPv6 and IPv4). Throws on failure
+/// (the port is taken, or below 1024 without privilege).
 @cap(Network)
 pub func listen(int32 port) -> Listener {
     int32 fd = tcp_listen(port)
@@ -79,8 +80,8 @@ pub func listen(int32 port) -> Listener {
     return Listener { fd: fd }
 }
 
-// Listen on one address: "::" (IPv6, and IPv4 where the system maps it),
-// "0.0.0.0" (IPv4), "127.0.0.1", "::1", or an interface's address.
+/// Listen on one address: "::" (IPv6, and IPv4 where the system maps it),
+/// "0.0.0.0" (IPv4), "127.0.0.1", "::1", or an interface's address.
 @cap(Network)
 pub func listen_on(str addr, int32 port) -> Listener {
     int32 fd = tcp_listen_on(addr, port)
@@ -90,7 +91,7 @@ pub func listen_on(str addr, int32 port) -> Listener {
     return Listener { fd: fd }
 }
 
-// Wait for and accept the next connection. Throws on failure.
+/// Wait for and accept the next connection. Throws on failure.
 @cap(Network)
 pub func accept(Listener l) -> Conn {
     int32 fd = tcp_accept(l.fd)
@@ -100,8 +101,8 @@ pub func accept(Listener l) -> Conn {
     return Conn { fd: fd }
 }
 
-// Read what has arrived (up to 64 KiB), waiting for at least one byte.
-// "" when the peer has closed the connection. Throws on failure.
+/// Read what has arrived (up to 64 KiB), waiting for at least one byte.
+/// "" when the peer has closed the connection. Throws on failure.
 @cap(Network)
 pub func recv(Conn c) -> str {
     str got = tcp_read(c.fd)
@@ -114,8 +115,8 @@ pub func recv(Conn c) -> str {
     return got
 }
 
-// recv, waiting at most `ms` milliseconds: null when nothing arrived in
-// time, "" when the peer closed the connection.
+/// recv, waiting at most `ms` milliseconds: null when nothing arrived in
+/// time, "" when the peer closed the connection.
 @cap(Network)
 pub func recv_timeout(Conn c, int32 ms) -> str? {
     int32 r = tcp_wait(c.fd, ms)
@@ -128,8 +129,8 @@ pub func recv_timeout(Conn c, int32 ms) -> str? {
     return recv(c)
 }
 
-// Write all of `data`. Returns its length. Throws on failure, including a
-// peer that has closed the connection (never a signal that ends the program).
+/// Write all of `data`. Returns its length. Throws on failure, including a
+/// peer that has closed the connection (never a signal that ends the program).
 @cap(Network)
 pub func send(Conn c, str data) -> int32 {
     int32 n = tcp_write(c.fd, data)
@@ -139,9 +140,9 @@ pub func send(Conn c, str data) -> int32 {
     return n
 }
 
-// Wait up to `ms` milliseconds (a negative `ms`: forever) until any of
-// `conns` has data or has been closed: the indexes of those that have, in
-// order; empty when the time ran out.
+/// Wait up to `ms` milliseconds (a negative `ms`: forever) until any of
+/// `conns` has data or has been closed: the indexes of those that have, in
+/// order; empty when the time ran out.
 @cap(Network)
 pub func poll(List[Conn] conns, int32 ms) -> List[int32] {
     str fds = ""
@@ -168,13 +169,13 @@ pub func poll(List[Conn] conns, int32 ms) -> List[int32] {
     return out
 }
 
-// Close a connection. Returns 0 on success.
+/// Close a connection. Returns 0 on success.
 @cap(Network)
 pub func close(Conn c) -> int32 {
     return tcp_close(c.fd)
 }
 
-// Stop listening (close the listening socket). Returns 0 on success.
+/// Stop listening (close the listening socket). Returns 0 on success.
 @cap(Network)
 pub func shutdown(Listener l) -> int32 {
     return tcp_close(l.fd)

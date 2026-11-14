@@ -1,8 +1,8 @@
-// std.http: a server and a client in one program. Routing, keep-alive with
-// pipelined requests, HTTP/1.0, queries, the limits (431, 413, a slow client
-// dropped), malformed requests (400), chunked responses, URL parsing, and an
-// https request to `openssl s_server` when the openssl command is installed.
-
+/// std.http: a server and a client in one program. Routing, keep-alive with
+/// pipelined requests, HTTP/1.0, queries, the limits (431, 413, a slow client
+/// dropped), malformed requests (400), chunked requests and responses, strict
+/// framing (bare CR/LF, folding, conflicting lengths), URL parsing, and an
+/// https request to `openssl s_server` when the openssl command is installed.
 module std.http.tests
 
 import std.http.{Request, Response, HttpConn, Limits, ClientRequest, Url, serve, limits, text, json, get, post, post_json, fetch, request, header_of, parse_url, parse_response, parse_request}
@@ -12,6 +12,7 @@ import std.os.{Output, execute, run, exit}
 import std.fs.{temp_dir, remove_all}
 import std.time.{mono_ms, sleep_ms}
 
+/// TODO: what `expect` does.
 func expect(bool cond, str name) -> int32 {
     if (cond) {
         println("  ok   " + name)
@@ -21,6 +22,7 @@ func expect(bool cond, str name) -> int32 {
     return 1
 }
 
+/// TODO: what `handle` does.
 @cap(Network)
 func handle(Conn c, Limits l) -> void {
     HttpConn h = serve(c, l)
@@ -45,6 +47,7 @@ func handle(Conn c, Limits l) -> void {
     discard close(c)
 }
 
+/// TODO: what `server` does.
 @cap(Network)
 func server(Listener ls, Limits l) -> void {
     while (true) {
@@ -52,7 +55,7 @@ func server(Listener ls, Limits l) -> void {
     }
 }
 
-// A server that answers one request with a chunked body.
+/// A server that answers one request with a chunked body.
 @cap(Network)
 func chunked_server(Listener ls) -> void {
     Conn c = accept(ls)
@@ -61,7 +64,17 @@ func chunked_server(Listener ls) -> void {
     discard close(c)
 }
 
-// Send `raw` on a new connection and read until the server closes it.
+/// TODO: what `throws_parse` does.
+func throws_parse(str raw) -> bool {
+    try {
+        discard parse_response(raw, false, "x")
+    } catch (str e) {
+        return true
+    }
+    return false
+}
+
+/// Send `raw` on a new connection and read until the server closes it.
 @cap(Network)
 func raw_exchange(int32 port, str raw) -> str {
     Conn c = connect("127.0.0.1", port)
@@ -80,6 +93,7 @@ func raw_exchange(int32 port, str raw) -> str {
     return all
 }
 
+/// TODO: what `main` does.
 @cap(Network)
 @cap(Process)
 @cap(File)
@@ -128,6 +142,25 @@ func main() -> void {
     int64 t0 = mono_ms()
     str slow = raw_exchange(port, "GET /healthz HTTP/1.1\r\nHost: x\r\n")
     fails += expect(slow == "" && mono_ms() - t0 < 2000, "a client that stops mid-request is dropped after the timeout")
+
+    str ch_in = raw_exchange(port, "POST /echo HTTP/1.1\r\nTransfer-Encoding: chunked\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n5\r\nhello\r\n6;x=1\r\n world\r\n0\r\nX-Trailer: 1\r\n\r\n")
+    fails += expect(ch_in.index_of("\"got\": \"hello world\"") >= 0, "a chunked request body (with an extension and a trailer)")
+    str both = raw_exchange(port, "POST /echo HTTP/1.1\r\nTransfer-Encoding: chunked\r\nContent-Length: 5\r\n\r\n5\r\nhello\r\n0\r\n\r\n")
+    fails += expect(both.starts_with("HTTP/1.1 400 "), "Transfer-Encoding with Content-Length: 400")
+    str twice = raw_exchange(port, "POST /echo HTTP/1.1\r\nContent-Length: 3\r\nContent-Length: 4\r\n\r\nabcd")
+    fails += expect(twice.starts_with("HTTP/1.1 400 "), "two different Content-Lengths: 400")
+    str bare = raw_exchange(port, "GET /healthz HTTP/1.1\nHost: x\r\n\r\n")
+    fails += expect(bare.starts_with("HTTP/1.1 400 "), "a bare LF in the headers: 400")
+    str folded = raw_exchange(port, "GET /healthz HTTP/1.1\r\nX-A: 1\r\n  more\r\n\r\n")
+    fails += expect(folded.starts_with("HTTP/1.1 400 "), "a folded header line: 400")
+    str gz = raw_exchange(port, "POST /echo HTTP/1.1\r\nTransfer-Encoding: gzip\r\n\r\n")
+    fails += expect(gz.starts_with("HTTP/1.1 501 "), "a transfer coding other than chunked: 501")
+    str big_chunks = raw_exchange(port, "POST /echo HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n64\r\n" + fill.substring(0, 100) + "\r\n64\r\n" + fill.substring(0, 100) + "\r\n0\r\n\r\n")
+    fails += expect(big_chunks.starts_with("HTTP/1.1 413 "), "a chunked body over the limit: 413")
+    fails += expect(throws_parse("HTTP/1.1 200 OK\r\nX-A: 1\r\rX-B: 2\r\n\r\n"), "a response with a bare CR is refused")
+    fails += expect(throws_parse("HTTP/1.1 2000 OK\r\n\r\n"), "a four-digit status is refused")
+    Response nob = parse_response("HTTP/1.1 204 No Content\r\nTransfer-Encoding: chunked\r\n\r\n", false, "x")
+    fails += expect(nob.status == 204 && nob.body == "", "a 204 has no body, whatever its headers say")
 
     int32 cport = port + 600
     spawn chunked_server(listen_on("127.0.0.1", cport))

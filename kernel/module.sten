@@ -1,12 +1,11 @@
-// Stenopos standard library — kernel.module
-// Module lifecycle and metadata.
-//
-// A loadable kernel module has an init function (run at `insmod`) and an exit
-// function (run at `rmmod`), plus metadata that `modinfo` reads. In C these
-// are wired up with the module_init()/module_exit() macros and
-// MODULE_LICENSE()/MODULE_AUTHOR()/... which place strings in the ".modinfo"
-// ELF section. Stenopos models both with @section placement.
-
+/// Stenopos standard library — kernel.module
+/// Module lifecycle and metadata.
+///
+/// A loadable kernel module has an init function (run at `insmod`) and an exit
+/// function (run at `rmmod`), plus metadata that `modinfo` reads. In C these
+/// are wired up with the module_init()/module_exit() macros and
+/// MODULE_LICENSE()/MODULE_AUTHOR()/... which place strings in the ".modinfo"
+/// ELF section. Stenopos models both with @section placement.
 module kernel.module
 
 // Return values for a module's init function.

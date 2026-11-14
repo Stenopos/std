@@ -1,3 +1,4 @@
+/// TODO: what this module is for.
 module std.bytes.tests
 
 import std.bytes.{
@@ -7,6 +8,7 @@ import std.bytes.{
     from_str, to_str, is_text, bytes_eq, slice
 }
 
+/// TODO: what `expect` does.
 func expect(bool cond, str name) -> int32 {
     if (cond) {
         println("  ok   {name}")
@@ -16,6 +18,7 @@ func expect(bool cond, str name) -> int32 {
     return 1
 }
 
+/// TODO: what `test_append_byte` does.
 func test_append_byte() -> int32 {
     int32 fails = 0
     List[int32] buf = bytes_new()
@@ -30,6 +33,7 @@ func test_append_byte() -> int32 {
     return fails
 }
 
+/// TODO: what `test_value_semantics` does.
 func test_value_semantics() -> int32 {
     int32 fails = 0
     // append returns a NEW buffer; the original is untouched.
@@ -40,6 +44,7 @@ func test_value_semantics() -> int32 {
     return fails
 }
 
+/// TODO: what `test_endianness` does.
 func test_endianness() -> int32 {
     int32 fails = 0
     List[int32] le16 = append_u16_le(bytes_new(), 258)
@@ -60,6 +65,7 @@ func test_endianness() -> int32 {
     return fails
 }
 
+/// TODO: what `test_str_conversion` does.
 func test_str_conversion() -> int32 {
     int32 fails = 0
     List[int32] b = from_str("Hi!")
@@ -72,6 +78,7 @@ func test_str_conversion() -> int32 {
     return fails
 }
 
+/// TODO: what `test_compare_slice` does.
 func test_compare_slice() -> int32 {
     int32 fails = 0
     List[int32] a = from_str("hello")
@@ -102,6 +109,7 @@ func test_compare_slice() -> int32 {
     return fails
 }
 
+/// TODO: what `main` does.
 func main() -> void {
     int32 fails = 0
     println("std.bytes tests:")

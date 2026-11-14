@@ -1,3 +1,4 @@
+/// TODO: what this module is for.
 module std.net.tests
 
 // std.net against this machine only: names it can resolve offline
@@ -5,6 +6,7 @@ module std.net.tests
 // and client talking over IPv6 loopback.
 import std.net.{Conn, Listener, resolve, connect, connect_timeout, listen_on, accept, recv, recv_timeout, send, poll, close, shutdown}
 
+/// TODO: what `expect` does.
 func expect(bool cond, str name) -> int32 {
     if (cond) {
         println("  ok   " + name)
@@ -14,7 +16,7 @@ func expect(bool cond, str name) -> int32 {
     return 1
 }
 
-// The message `f` throws, or "" if it doesn't.
+/// The message `f` throws, or "" if it doesn't.
 @cap(Network)
 func error_of_resolve(str host) -> str {
     try {
@@ -25,6 +27,7 @@ func error_of_resolve(str host) -> str {
     return ""
 }
 
+/// TODO: what `error_of_connect` does.
 @cap(Network)
 func error_of_connect(str host, int32 port, int32 ms) -> str {
     try {
@@ -36,6 +39,7 @@ func error_of_connect(str host, int32 port, int32 ms) -> str {
     return ""
 }
 
+/// TODO: what `test_errors` does.
 @cap(Network)
 func test_errors() -> int32 {
     int32 fails = 0
@@ -53,6 +57,7 @@ func test_errors() -> int32 {
     return fails
 }
 
+/// TODO: what `test_conversation` does.
 @cap(Network)
 func test_conversation() -> int32 {
     int32 fails = 0
@@ -98,6 +103,7 @@ func test_conversation() -> int32 {
     return fails
 }
 
+/// TODO: what `main` does.
 @cap(Network)
 func main() -> void {
     int32 fails = 0

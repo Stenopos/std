@@ -1,13 +1,13 @@
-// Tests for std.testing — run with:
-//   stenopos-cli run std/testing/test_testing.sten
-// The framework tests itself: each helper must return 0 on a passing check
-// and 1 on a failing one. We verify the RETURN VALUES (the printed lines for
-// the intentionally-failing cases are expected noise).
-
+/// Tests for std.testing — run with:
+///   stenopos-cli run std/testing/test_testing.sten
+/// The framework tests itself: each helper must return 0 on a passing check
+/// and 1 on a failing one. We verify the RETURN VALUES (the printed lines for
+/// the intentionally-failing cases are expected noise).
 module std.testing.tests
 
 import std.testing.{expect, expect_eq_int, expect_eq_str, expect_true, expect_false, report}
 
+/// TODO: what `main` does.
 func main() -> int32 {
     int32 fails = 0
 

@@ -1,17 +1,17 @@
-// Stenopos standard library — Ed25519 signature verification (RFC 8032).
-// Pure Stenopos, no FFI. Byte buffers are List[int32] values 0..255.
-//
-// The structure follows TweetNaCl's verifier (16 limbs of 16 bits per field
-// element, extended twisted-Edwards coordinates), with RFC 8032's check that
-// the signature's S is below the group order L. Verification handles only
-// public data (keys, messages, signatures), so it is not constant-time.
-// The constants are derived from the curve (see std's tools): d, 2d, the base
-// point B = (x, 4/5) and sqrt(-1), each as 16 little-endian 16-bit limbs.
-
+/// Stenopos standard library — Ed25519 signature verification (RFC 8032).
+/// Pure Stenopos, no FFI. Byte buffers are List[int32] values 0..255.
+///
+/// The structure follows TweetNaCl's verifier (16 limbs of 16 bits per field
+/// element, extended twisted-Edwards coordinates), with RFC 8032's check that
+/// the signature's S is below the group order L. Verification handles only
+/// public data (keys, messages, signatures), so it is not constant-time.
+/// The constants are derived from the curve (see std's tools): d, 2d, the base
+/// point B = (x, 4/5) and sqrt(-1), each as 16 little-endian 16-bit limbs.
 module std.crypto.ed25519
 
 import std.crypto.sha512.{sha512}
 
+/// TODO: what `fe_d` does.
 func fe_d() -> List[int64] {
     List[int64] t = list_new()
     t.push(30883)
@@ -33,6 +33,7 @@ func fe_d() -> List[int64] {
     return t
 }
 
+/// TODO: what `fe_d2` does.
 func fe_d2() -> List[int64] {
     List[int64] t = list_new()
     t.push(61785)
@@ -54,6 +55,7 @@ func fe_d2() -> List[int64] {
     return t
 }
 
+/// TODO: what `fe_base_x` does.
 func fe_base_x() -> List[int64] {
     List[int64] t = list_new()
     t.push(54554)
@@ -75,6 +77,7 @@ func fe_base_x() -> List[int64] {
     return t
 }
 
+/// TODO: what `fe_base_y` does.
 func fe_base_y() -> List[int64] {
     List[int64] t = list_new()
     t.push(26200)
@@ -96,6 +99,7 @@ func fe_base_y() -> List[int64] {
     return t
 }
 
+/// TODO: what `fe_sqrtm1` does.
 func fe_sqrtm1() -> List[int64] {
     List[int64] t = list_new()
     t.push(41136)
@@ -117,6 +121,7 @@ func fe_sqrtm1() -> List[int64] {
     return t
 }
 
+/// TODO: what `order_l` does.
 func order_l() -> List[int32] {
     List[int32] t = list_new()
     t.push(237)
@@ -156,6 +161,7 @@ func order_l() -> List[int32] {
 
 // --- field arithmetic mod p = 2^255 - 19 -----------------------------------
 
+/// TODO: what `fe_zero` does.
 func fe_zero() -> List[int64] {
     List[int64] o = list_new()
     int32 i = 0
@@ -166,14 +172,15 @@ func fe_zero() -> List[int64] {
     return o
 }
 
+/// TODO: what `fe_one` does.
 func fe_one() -> List[int64] {
     List[int64] o = fe_zero()
     o.set(0, 1)
     return o
 }
 
-// Propagate carries so every limb is back in 0..2^16; the carry out of the
-// top limb wraps to limb 0 times 38 (2^256 = 38 mod p).
+/// Propagate carries so every limb is back in 0..2^16; the carry out of the
+/// top limb wraps to limb 0 times 38 (2^256 = 38 mod p).
 func fe_carry(List[int64] a) -> List[int64] {
     List[int64] o = a
     int64 i = 0
@@ -191,6 +198,7 @@ func fe_carry(List[int64] a) -> List[int64] {
     return o
 }
 
+/// TODO: what `fe_add` does.
 func fe_add(List[int64] a, List[int64] b) -> List[int64] {
     List[int64] o = list_new()
     int64 i = 0
@@ -201,6 +209,7 @@ func fe_add(List[int64] a, List[int64] b) -> List[int64] {
     return o
 }
 
+/// TODO: what `fe_sub` does.
 func fe_sub(List[int64] a, List[int64] b) -> List[int64] {
     List[int64] o = list_new()
     int64 i = 0
@@ -211,6 +220,7 @@ func fe_sub(List[int64] a, List[int64] b) -> List[int64] {
     return o
 }
 
+/// TODO: what `fe_mul` does.
 func fe_mul(List[int64] a, List[int64] b) -> List[int64] {
     List[int64] t = list_new()
     int32 k = 0
@@ -238,11 +248,12 @@ func fe_mul(List[int64] a, List[int64] b) -> List[int64] {
     return fe_carry(fe_carry(o))
 }
 
+/// TODO: what `fe_sq` does.
 func fe_sq(List[int64] a) -> List[int64] {
     return fe_mul(a, a)
 }
 
-// a^(p-2) = 1/a.
+/// a^(p-2) = 1/a.
 func fe_invert(List[int64] a) -> List[int64] {
     List[int64] c = a
     int32 k = 253
@@ -256,7 +267,7 @@ func fe_invert(List[int64] a) -> List[int64] {
     return c
 }
 
-// a^((p-5)/8), used for square roots.
+/// a^((p-5)/8), used for square roots.
 func fe_pow2523(List[int64] a) -> List[int64] {
     List[int64] c = a
     int32 k = 250
@@ -270,7 +281,7 @@ func fe_pow2523(List[int64] a) -> List[int64] {
     return c
 }
 
-// The canonical 32-byte little-endian encoding (fully reduced mod p).
+/// The canonical 32-byte little-endian encoding (fully reduced mod p).
 func fe_pack(List[int64] n) -> List[int32] {
     List[int64] t = fe_carry(fe_carry(fe_carry(n)))
     int32 pass = 0
@@ -301,6 +312,7 @@ func fe_pack(List[int64] n) -> List[int32] {
     return out
 }
 
+/// TODO: what `fe_unpack` does.
 func fe_unpack(List[int32] b) -> List[int64] {
     List[int64] o = list_new()
     int64 i = 0
@@ -312,6 +324,7 @@ func fe_unpack(List[int32] b) -> List[int64] {
     return o
 }
 
+/// TODO: what `bytes_eq` does.
 func bytes_eq(List[int32] a, List[int32] b) -> bool {
     if (a.len() != b.len()) {
         return false
@@ -326,10 +339,12 @@ func bytes_eq(List[int32] a, List[int32] b) -> bool {
     return true
 }
 
+/// TODO: what `fe_eq` does.
 func fe_eq(List[int64] a, List[int64] b) -> bool {
     return bytes_eq(fe_pack(a), fe_pack(b))
 }
 
+/// TODO: what `fe_parity` does.
 func fe_parity(List[int64] a) -> int32 {
     return fe_pack(a).get(0) & 1
 }
@@ -337,6 +352,7 @@ func fe_parity(List[int64] a) -> int32 {
 // --- points: (X, Y, Z, T) with x = X/Z, y = Y/Z, xy = T/Z -------------------
 // A point is a flat List[int64] of 64 limbs: X = 0..15, Y = 16..31, ...
 
+/// TODO: what `pt_coord` does.
 func pt_coord(List[int64] p, int64 k) -> List[int64] {
     List[int64] o = list_new()
     int64 i = 0
@@ -347,6 +363,7 @@ func pt_coord(List[int64] p, int64 k) -> List[int64] {
     return o
 }
 
+/// TODO: what `pt_make` does.
 func pt_make(List[int64] x, List[int64] y, List[int64] z, List[int64] t) -> List[int64] {
     List[int64] p = list_new()
     for (v in x) {
@@ -364,6 +381,7 @@ func pt_make(List[int64] x, List[int64] y, List[int64] z, List[int64] t) -> List
     return p
 }
 
+/// TODO: what `pt_add` does.
 func pt_add(List[int64] p, List[int64] q) -> List[int64] {
     List[int64] px = pt_coord(p, 0)
     List[int64] py = pt_coord(p, 1)
@@ -385,7 +403,7 @@ func pt_add(List[int64] p, List[int64] q) -> List[int64] {
     return pt_make(fe_mul(e, f), fe_mul(h, g), fe_mul(g, f), fe_mul(e, h))
 }
 
-// The canonical 32-byte encoding: y, with x's parity in the top bit.
+/// The canonical 32-byte encoding: y, with x's parity in the top bit.
 func pt_pack(List[int64] p) -> List[int32] {
     List[int64] zi = fe_invert(pt_coord(p, 2))
     List[int64] tx = fe_mul(pt_coord(p, 0), zi)
@@ -395,7 +413,7 @@ func pt_pack(List[int64] p) -> List[int32] {
     return r
 }
 
-// [s]q for a 32-byte little-endian scalar s (public data: not constant-time).
+/// [s]q for a 32-byte little-endian scalar s (public data: not constant-time).
 func pt_scalarmult(List[int64] q0, List[int32] s) -> List[int64] {
     List[int64] p = pt_make(fe_zero(), fe_one(), fe_one(), fe_zero())
     List[int64] q = q0
@@ -414,12 +432,13 @@ func pt_scalarmult(List[int64] q0, List[int32] s) -> List[int64] {
     return p
 }
 
+/// TODO: what `pt_base` does.
 func pt_base() -> List[int64] {
     return pt_make(fe_base_x(), fe_base_y(), fe_one(), fe_mul(fe_base_x(), fe_base_y()))
 }
 
-// Decode a public key as the NEGATED point -A (what the check needs), or an
-// empty list if the encoding is not a point on the curve.
+/// Decode a public key as the NEGATED point -A (what the check needs), or an
+/// empty list if the encoding is not a point on the curve.
 func pt_unpack_neg(List[int32] pk) -> List[int64] {
     List[int64] r2 = fe_one()
     List[int64] r1 = fe_unpack(pk)
@@ -449,7 +468,7 @@ func pt_unpack_neg(List[int32] pk) -> List[int64] {
 
 // --- scalars mod L ----------------------------------------------------------
 
-// A 64-byte little-endian number reduced mod L, as 32 bytes.
+/// A 64-byte little-endian number reduced mod L, as 32 bytes.
 func mod_l(List[int32] h) -> List[int32] {
     List[int32] lb = order_l()
     List[int64] x = list_new()
@@ -493,7 +512,7 @@ func mod_l(List[int32] h) -> List[int32] {
     return r
 }
 
-// Is the 32-byte little-endian scalar below L? (RFC 8032 rejects S >= L.)
+/// Is the 32-byte little-endian scalar below L? (RFC 8032 rejects S >= L.)
 func below_l(List[int32] s) -> bool {
     List[int32] lb = order_l()
     int64 i = 31
@@ -509,6 +528,7 @@ func below_l(List[int32] s) -> bool {
     return false
 }
 
+/// TODO: what `slice_bytes` does.
 func slice_bytes(List[int32] b, int64 from, int64 to) -> List[int32] {
     List[int32] o = list_new()
     int64 i = from
@@ -519,8 +539,8 @@ func slice_bytes(List[int32] b, int64 from, int64 to) -> List[int32] {
     return o
 }
 
-// Verify a 64-byte Ed25519 signature `sig` of `msg` by the 32-byte public key
-// `pk`. True only for a valid signature; any malformed input is false.
+/// Verify a 64-byte Ed25519 signature `sig` of `msg` by the 32-byte public key
+/// `pk`. True only for a valid signature; any malformed input is false.
 pub func ed25519_verify(List[int32] pk, List[int32] msg, List[int32] sig) -> bool {
     if (pk.len() != 32 || sig.len() != 64) {
         return false

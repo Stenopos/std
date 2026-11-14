@@ -1,12 +1,12 @@
-// Tests for std.hex — run with (from the std checkout):
-//   export STENOPOS_STD=$(pwd)
-//   stenopos run hex/test_hex.sten
-// Prints one ok/FAIL line per check and a PASS/FAIL summary.
-
+/// Tests for std.hex — run with (from the std checkout):
+///   export STENOPOS_STD=$(pwd)
+///   stenopos run hex/test_hex.sten
+/// Prints one ok/FAIL line per check and a PASS/FAIL summary.
 module std.hex.tests
 
 import std.hex.{hex_encode, hex_decode}
 
+/// TODO: what `expect` does.
 func expect(bool cond, str name) -> int32 {
     if (cond) {
         println("  ok   {name}")
@@ -16,6 +16,7 @@ func expect(bool cond, str name) -> int32 {
     return 1
 }
 
+/// TODO: what `expect_str` does.
 func expect_str(str got, str want, str name) -> int32 {
     if (got == want) {
         return expect(true, name)
@@ -24,6 +25,7 @@ func expect_str(str got, str want, str name) -> int32 {
     return 1
 }
 
+/// TODO: what `bytes_eq` does.
 func bytes_eq(List[int32] a, List[int32] b) -> bool {
     if (a.len() != b.len()) {
         return false
@@ -38,6 +40,7 @@ func bytes_eq(List[int32] a, List[int32] b) -> bool {
     return true
 }
 
+/// TODO: what `make_bytes_255_0_16` does.
 func make_bytes_255_0_16() -> List[int32] {
     List[int32] xs = list_new()
     xs.push(255)
@@ -46,6 +49,7 @@ func make_bytes_255_0_16() -> List[int32] {
     return xs
 }
 
+/// TODO: what `test_known_vectors` does.
 func test_known_vectors() -> int32 {
     int32 fails = 0
     fails += expect_str(hex_encode(make_bytes_255_0_16()), "ff0010", "hex_encode known vector")
@@ -55,6 +59,7 @@ func test_known_vectors() -> int32 {
     return fails
 }
 
+/// TODO: what `test_round_trip` does.
 func test_round_trip() -> int32 {
     int32 fails = 0
 
@@ -86,6 +91,7 @@ func test_round_trip() -> int32 {
     return fails
 }
 
+/// TODO: what `test_invalid_input` does.
 func test_invalid_input() -> int32 {
     int32 fails = 0
 
@@ -110,6 +116,7 @@ func test_invalid_input() -> int32 {
     return fails
 }
 
+/// TODO: what `main` does.
 func main() -> void {
     int32 fails = 0
     println("std.hex tests:")

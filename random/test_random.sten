@@ -1,14 +1,14 @@
-// Tests for std.random — run with:
-//   stenopos-cli run std/random/test_random.sten
-// Prints one ok/FAIL line per check and a PASS/FAIL summary. State is threaded
-// functionally throughout, exactly as callers are expected to use the module.
-
+/// Tests for std.random — run with:
+///   stenopos-cli run std/random/test_random.sten
+/// Prints one ok/FAIL line per check and a PASS/FAIL summary. State is threaded
+/// functionally throughout, exactly as callers are expected to use the module.
 module std.random.tests
 
 import std.random.{rng_seed, rng_next, rng_u32, rng_range, rng_bool, rng_float}
 import std.random.{rng_below, rng_dice, rng_coin, rng_sign, rng_byte}
 import std.random.{rng_float_range, rng_chance, rng_shuffle_i32, rng_max_u32}
 
+/// TODO: what `expect` does.
 func expect(bool cond, str name) -> int32 {
     if (cond) {
         println("  ok   {name}")
@@ -18,7 +18,7 @@ func expect(bool cond, str name) -> int32 {
     return 1
 }
 
-// The key property: the same seed reproduces the exact same sequence.
+/// The key property: the same seed reproduces the exact same sequence.
 func test_determinism() -> int32 {
     int32 fails = 0
     int64 a = rng_seed(42)
@@ -52,6 +52,7 @@ func test_determinism() -> int32 {
     return fails
 }
 
+/// TODO: what `test_range` does.
 func test_range() -> int32 {
     int32 fails = 0
     int64 s = rng_seed(7)
@@ -95,6 +96,7 @@ func test_range() -> int32 {
     return fails
 }
 
+/// TODO: what `test_bool_distribution` does.
 func test_bool_distribution() -> int32 {
     int32 fails = 0
     int64 s = rng_seed(1234)
@@ -116,6 +118,7 @@ func test_bool_distribution() -> int32 {
     return fails
 }
 
+/// TODO: what `test_float` does.
 func test_float() -> int32 {
     int32 fails = 0
     int64 s = rng_seed(99)
@@ -155,6 +158,7 @@ func test_float() -> int32 {
     return fails
 }
 
+/// TODO: what `test_helpers` does.
 func test_helpers() -> int32 {
     int32 fails = 0
     int64 s = rng_seed(2026)
@@ -213,6 +217,7 @@ func test_helpers() -> int32 {
     return fails
 }
 
+/// TODO: what `test_shuffle` does.
 func test_shuffle() -> int32 {
     int32 fails = 0
     int32 n = 10
@@ -261,6 +266,7 @@ func test_shuffle() -> int32 {
     return fails
 }
 
+/// TODO: what `main` does.
 func main() -> void {
     int32 fails = 0
     println("std.random tests:")

@@ -1,28 +1,27 @@
-// Stenopos standard library — list module
-//
-// Generic helpers over the built-in `List[T]`. Unlike `std.collections` (whose
-// aggregation helpers carry a type suffix because summing needs a known numeric
-// type), everything here is element-type-agnostic: the type parameter `T` is
-// inferred from the argument list and the compiler monomorphizes a copy per
-// concrete element type. They work for `List[int32]`, `List[str]`, and any
-// other supported element type.
-//
-// Equality-based helpers (contains / index_of / count) use `==`, which the
-// compiler lowers appropriately per concrete type (integer compare, string
-// content compare, ...).
-
+/// Stenopos standard library — list module
+///
+/// Generic helpers over the built-in `List[T]`. Unlike `std.collections` (whose
+/// aggregation helpers carry a type suffix because summing needs a known numeric
+/// type), everything here is element-type-agnostic: the type parameter `T` is
+/// inferred from the argument list and the compiler monomorphizes a copy per
+/// concrete element type. They work for `List[int32]`, `List[str]`, and any
+/// other supported element type.
+///
+/// Equality-based helpers (contains / index_of / count) use `==`, which the
+/// compiler lowers appropriately per concrete type (integer compare, string
+/// content compare, ...).
 module std.list
 
 // ---------------------------------------------------------------------------
 // Inspecting
 // ---------------------------------------------------------------------------
 
-// True when the list has no elements.
+/// True when the list has no elements.
 pub func is_empty[T](List[T] xs) -> bool {
     return xs.len() == 0
 }
 
-// The first element. Throws on an empty list.
+/// The first element. Throws on an empty list.
 pub func first[T](List[T] xs) -> T {
     if (xs.len() == 0) {
         throw("list.first: empty list")
@@ -30,7 +29,7 @@ pub func first[T](List[T] xs) -> T {
     return xs.get(0)
 }
 
-// The last element. Throws on an empty list.
+/// The last element. Throws on an empty list.
 pub func last[T](List[T] xs) -> T {
     if (xs.len() == 0) {
         throw("list.last: empty list")
@@ -42,7 +41,7 @@ pub func last[T](List[T] xs) -> T {
 // Searching (by content equality)
 // ---------------------------------------------------------------------------
 
-// True when some element equals `target`.
+/// True when some element equals `target`.
 pub func contains[T](List[T] xs, T target) -> bool {
     for (x in xs) {
         if (x == target) {
@@ -52,7 +51,7 @@ pub func contains[T](List[T] xs, T target) -> bool {
     return false
 }
 
-// Index of the first element equal to `target`, or -1 if none.
+/// Index of the first element equal to `target`, or -1 if none.
 pub func index_of[T](List[T] xs, T target) -> int32 {
     int32 i = 0
     for (x in xs) {
@@ -64,7 +63,7 @@ pub func index_of[T](List[T] xs, T target) -> int32 {
     return 0 - 1
 }
 
-// How many elements equal `target`.
+/// How many elements equal `target`.
 pub func count[T](List[T] xs, T target) -> int32 {
     int32 hits = 0
     for (x in xs) {
@@ -79,7 +78,7 @@ pub func count[T](List[T] xs, T target) -> int32 {
 // Building new lists (originals are never modified)
 // ---------------------------------------------------------------------------
 
-// A shallow copy of `xs`.
+/// A shallow copy of `xs`.
 pub func copy[T](List[T] xs) -> List[T] {
     List[T] out = list_new()
     for (x in xs) {
@@ -88,7 +87,7 @@ pub func copy[T](List[T] xs) -> List[T] {
     return out
 }
 
-// All of `a` followed by all of `b`, in a new list.
+/// All of `a` followed by all of `b`, in a new list.
 pub func concat[T](List[T] a, List[T] b) -> List[T] {
     List[T] out = list_new()
     for (x in a) {
@@ -100,8 +99,8 @@ pub func concat[T](List[T] a, List[T] b) -> List[T] {
     return out
 }
 
-// `value` repeated `n` times. n <= 0 yields an empty list.
-// (Named `fill` rather than `repeat` because `repeat` is a reserved word.)
+/// `value` repeated `n` times. n <= 0 yields an empty list.
+/// (Named `fill` rather than `repeat` because `repeat` is a reserved word.)
 pub func fill[T](T value, int32 n) -> List[T] {
     List[T] out = list_new()
     int32 i = 0
@@ -112,7 +111,7 @@ pub func fill[T](T value, int32 n) -> List[T] {
     return out
 }
 
-// `xs` with its elements in reverse order, in a new list.
+/// `xs` with its elements in reverse order, in a new list.
 pub func reverse[T](List[T] xs) -> List[T] {
     List[T] out = list_new()
     int64 i = xs.len()
@@ -123,7 +122,7 @@ pub func reverse[T](List[T] xs) -> List[T] {
     return out
 }
 
-// The first `n` elements (fewer if the list is shorter). n <= 0 yields [].
+/// The first `n` elements (fewer if the list is shorter). n <= 0 yields [].
 pub func take[T](List[T] xs, int64 n) -> List[T] {
     List[T] out = list_new()
     int64 limit = n
@@ -138,7 +137,7 @@ pub func take[T](List[T] xs, int64 n) -> List[T] {
     return out
 }
 
-// All elements after the first `n` (empty if n covers the whole list).
+/// All elements after the first `n` (empty if n covers the whole list).
 pub func drop[T](List[T] xs, int64 n) -> List[T] {
     List[T] out = list_new()
     int64 start = n

@@ -1,14 +1,14 @@
-// Tests for std.os — run with:
-//   stenopos-cli run std/os/test_os.sten
-// Exercises the shell-command and argv helpers. (When run via `stenopos run`
-// there are no extra program arguments, so args() is empty and has_flag is
-// false — that IS the property we check.)
-
+/// Tests for std.os — run with:
+///   stenopos-cli run std/os/test_os.sten
+/// Exercises the shell-command and argv helpers. (When run via `stenopos run`
+/// there are no extra program arguments, so args() is empty and has_flag is
+/// false — that IS the property we check.)
 module std.os.tests
 
 import std.testing.{expect, expect_eq_int, report}
 import std.os.{run, run_ok, argc, arg_at, args, has_flag}
 
+/// TODO: what `main` does.
 @cap(Process)
 func main() -> int32 {
     int32 fails = 0

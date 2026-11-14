@@ -1,12 +1,12 @@
-// Tests for std.crypto.ed25519. Valid signatures were made by OpenSSL and by
-// Python's cryptography package (independent implementations); each invalid
-// case is derived from a valid one.
-
+/// Tests for std.crypto.ed25519. Valid signatures were made by OpenSSL and by
+/// Python's cryptography package (independent implementations); each invalid
+/// case is derived from a valid one.
 module std.crypto.ed25519_tests
 
 import std.crypto.ed25519.{ed25519_verify}
 import std.hex.{hex_decode}
 
+/// TODO: what `check` does.
 func check(str pk, str msg, str sig, bool want, str name) -> int32 {
     bool got = ed25519_verify(hex_decode(pk), hex_decode(msg), hex_decode(sig))
     if (got == want) {
@@ -17,6 +17,7 @@ func check(str pk, str msg, str sig, bool want, str name) -> int32 {
     return 1
 }
 
+/// TODO: what `main` does.
 func main() -> void {
     int32 fails = 0
     println("std.crypto ed25519 tests:")

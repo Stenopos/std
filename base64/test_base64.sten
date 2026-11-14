@@ -1,7 +1,9 @@
+/// TODO: what this module is for.
 module std.base64.tests
 
 import std.base64.{base64_encode, base64_decode}
 
+/// TODO: what `expect` does.
 func expect(bool cond, str name) -> int32 {
     if (cond) {
         println("  ok   {name}")
@@ -11,6 +13,7 @@ func expect(bool cond, str name) -> int32 {
     return 1
 }
 
+/// TODO: what `expect_str` does.
 func expect_str(str got, str want, str name) -> int32 {
     if (got == want) {
         return expect(true, name)
@@ -19,6 +22,7 @@ func expect_str(str got, str want, str name) -> int32 {
     return 1
 }
 
+/// TODO: what `bytes_of` does.
 func bytes_of(str s) -> List[int32] {
     List[int32] b = list_new()
     int64 i = 0
@@ -30,6 +34,7 @@ func bytes_of(str s) -> List[int32] {
     return b
 }
 
+/// TODO: what `bytes_eq` does.
 func bytes_eq(List[int32] a, List[int32] b) -> bool {
     if (a.len() != b.len()) {
         return false
@@ -44,6 +49,7 @@ func bytes_eq(List[int32] a, List[int32] b) -> bool {
     return true
 }
 
+/// TODO: what `test_known_vectors` does.
 func test_known_vectors() -> int32 {
     int32 fails = 0
     // The RFC 4648 padding examples.
@@ -55,6 +61,7 @@ func test_known_vectors() -> int32 {
     return fails
 }
 
+/// TODO: what `test_round_trip` does.
 func test_round_trip() -> int32 {
     int32 fails = 0
     fails += expect(bytes_eq(base64_decode(base64_encode(bytes_of(""))), bytes_of("")), "round trip empty")
@@ -66,6 +73,7 @@ func test_round_trip() -> int32 {
     return fails
 }
 
+/// TODO: what `test_invalid` does.
 func test_invalid() -> int32 {
     int32 fails = 0
     int32 caught = 0
@@ -79,6 +87,7 @@ func test_invalid() -> int32 {
     return fails
 }
 
+/// TODO: what `main` does.
 func main() -> void {
     int32 fails = 0
     println("std.base64 tests:")

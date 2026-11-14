@@ -1,11 +1,11 @@
-// Tests for std.io — run with:
-//   stenopos-cli run std/io/test_io.sten
-// Uses a scratch file under /tmp. Prints ok/FAIL lines and a summary.
-
+/// Tests for std.io — run with:
+///   stenopos-cli run std/io/test_io.sten
+/// Uses a scratch file under /tmp. Prints ok/FAIL lines and a summary.
 module std.io.tests
 
 import std.io.{read_lines, write_lines, append_file}
 
+/// TODO: what `expect` does.
 func expect(bool cond, str name) -> int32 {
     if (cond) {
         println("  ok   {name}")
@@ -15,6 +15,7 @@ func expect(bool cond, str name) -> int32 {
     return 1
 }
 
+/// TODO: what `test_roundtrip` does.
 @cap(File)
 func test_roundtrip(str path) -> int32 {
     int32 fails = 0
@@ -34,6 +35,7 @@ func test_roundtrip(str path) -> int32 {
     return fails
 }
 
+/// TODO: what `test_append` does.
 @cap(File)
 func test_append(str path) -> int32 {
     int32 fails = 0
@@ -51,6 +53,7 @@ func test_append(str path) -> int32 {
     return fails
 }
 
+/// TODO: what `test_missing_file` does.
 @cap(File)
 func test_missing_file() -> int32 {
     int32 fails = 0
@@ -59,6 +62,7 @@ func test_missing_file() -> int32 {
     return fails
 }
 
+/// TODO: what `main` does.
 @cap(File)
 func main() -> void {
     int32 fails = 0

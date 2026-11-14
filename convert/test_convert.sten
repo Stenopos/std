@@ -1,12 +1,12 @@
-// Tests for std.convert — run with:
-//   STENOPOS_STD=<checkout> stenopos run std/convert/test_convert.sten
-
+/// Tests for std.convert — run with:
+///   STENOPOS_STD=<checkout> stenopos run std/convert/test_convert.sten
 module std.convert.tests
 
 import std.testing.{expect, expect_eq_int, expect_eq_str, report}
 import std.convert.{int_to_str, int64_to_str, float_to_str, bool_to_str}
 import std.convert.{is_int, parse_int, str_to_int, parse_int64, parse_int32}
 
+/// TODO: what `main` does.
 func main() -> int32 {
     int32 fails = 0
 

@@ -1,10 +1,9 @@
-// Stenopos standard library — kernel.errno
-// Standard Linux error codes, as the NEGATIVE values kernel functions return.
-//
-// Kernel functions signal failure by returning `-Exxx` (e.g. a read handler
-// returns -EFAULT if copy_to_user fails). Userspace then sees errno = Exxx.
-// Use these constants instead of magic numbers like `-14`.
-
+/// Stenopos standard library — kernel.errno
+/// Standard Linux error codes, as the NEGATIVE values kernel functions return.
+///
+/// Kernel functions signal failure by returning `-Exxx` (e.g. a read handler
+/// returns -EFAULT if copy_to_user fails). Userspace then sees errno = Exxx.
+/// Use these constants instead of magic numbers like `-14`.
 module kernel.errno
 
 const int32 EPERM   = -1    // Operation not permitted

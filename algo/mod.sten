@@ -1,10 +1,9 @@
-// Stenopos standard library — algo module
-// Small, allocation-returning algorithms over List[int32]: each returns a fresh
-// result and leaves its input untouched.
-
+/// Stenopos standard library — algo module
+/// Small, allocation-returning algorithms over List[int32]: each returns a fresh
+/// result and leaves its input untouched.
 module std.algo
 
-// A reversed copy of `xs`.
+/// A reversed copy of `xs`.
 pub func reverse_i32(List[int32] xs) -> List[int32] {
     List[int32] out = list_new()
     int32 i = cast[int32](xs.len()) - 1
@@ -15,15 +14,15 @@ pub func reverse_i32(List[int32] xs) -> List[int32] {
     return out
 }
 
-// A sorted (ascending) copy of `xs`. The input is deep-copied, so it is left
-// unchanged.
+/// A sorted (ascending) copy of `xs`. The input is deep-copied, so it is left
+/// unchanged.
 pub func sort_i32(List[int32] xs) -> List[int32] {
     List[int32] out = xs
     out.sort()
     return out
 }
 
-// The index of `target` in the SORTED list `xs`, or -1 if absent (binary search).
+/// The index of `target` in the SORTED list `xs`, or -1 if absent (binary search).
 pub func binary_search(List[int32] xs, int32 target) -> int32 {
     int32 lo = 0
     int32 hi = cast[int32](xs.len()) - 1
@@ -42,8 +41,8 @@ pub func binary_search(List[int32] xs, int32 target) -> int32 {
     return 0 - 1
 }
 
-// Remove consecutive duplicates from a SORTED list (so a sorted input yields its
-// distinct elements).
+/// Remove consecutive duplicates from a SORTED list (so a sorted input yields its
+/// distinct elements).
 pub func unique_i32(List[int32] xs) -> List[int32] {
     List[int32] out = list_new()
     int32 n = cast[int32](xs.len())

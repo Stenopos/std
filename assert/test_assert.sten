@@ -1,15 +1,15 @@
-// Tests for std.assert — run with:
-//   STENOPOS_STD=<checkout> stenopos run std/assert/test_assert.sten
-// A failing assertion aborts the whole process, so this test only exercises
-// the PASSING paths (reaching `report` at the end IS the assertion that none
-// of them fired). The abort behavior is verified by the compiler's own
-// compile-fail / runtime tests elsewhere.
-
+/// Tests for std.assert — run with:
+///   STENOPOS_STD=<checkout> stenopos run std/assert/test_assert.sten
+/// A failing assertion aborts the whole process, so this test only exercises
+/// the PASSING paths (reaching `report` at the end IS the assertion that none
+/// of them fired). The abort behavior is verified by the compiler's own
+/// compile-fail / runtime tests elsewhere.
 module std.assert.tests
 
 import std.testing.{expect, report}
 import std.assert.{assert, assert_eq_int, assert_eq_str, assert_false}
 
+/// TODO: what `main` does.
 func main() -> int32 {
     int32 fails = 0
 

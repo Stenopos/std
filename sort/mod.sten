@@ -1,16 +1,15 @@
-// Stenopos standard library — sort module
-// Sorting and searching. Pure Stenopos, no FFI.
-//
-// Value semantics: a sort RETURNS a new sorted list and never mutates its
-// argument (consistent with `std.list`, and forward-compatible with copy-on-write
-// collections). Sorting is an insertion sort on a local copy — O(n^2) worst
-// case, no recursion or extra passes, fine for the list sizes std sees. A
-// comparator-based sort is Phase 2 / 1.1 (needs closures). Ascending order only
-// (natural numeric order; lexicographic byte order for strings).
-
+/// Stenopos standard library — sort module
+/// Sorting and searching. Pure Stenopos, no FFI.
+///
+/// Value semantics: a sort RETURNS a new sorted list and never mutates its
+/// argument (consistent with `std.list`, and forward-compatible with copy-on-write
+/// collections). Sorting is an insertion sort on a local copy — O(n^2) worst
+/// case, no recursion or extra passes, fine for the list sizes std sees. A
+/// comparator-based sort is Phase 2 / 1.1 (needs closures). Ascending order only
+/// (natural numeric order; lexicographic byte order for strings).
 module std.sort
 
-// A fresh copy of an int32 list.
+/// A fresh copy of an int32 list.
 func copy_i32(List[int32] xs) -> List[int32] {
     List[int32] out = list_new()
     for (v in xs) {
@@ -19,7 +18,7 @@ func copy_i32(List[int32] xs) -> List[int32] {
     return out
 }
 
-// A fresh copy of an int64 list.
+/// A fresh copy of an int64 list.
 func copy_i64(List[int64] xs) -> List[int64] {
     List[int64] out = list_new()
     for (v in xs) {
@@ -28,7 +27,7 @@ func copy_i64(List[int64] xs) -> List[int64] {
     return out
 }
 
-// A fresh copy of a str list.
+/// A fresh copy of a str list.
 func copy_str(List[str] xs) -> List[str] {
     List[str] out = list_new()
     for (v in xs) {
@@ -37,7 +36,7 @@ func copy_str(List[str] xs) -> List[str] {
     return out
 }
 
-// True when `a` sorts before `b` in lexicographic byte order.
+/// True when `a` sorts before `b` in lexicographic byte order.
 func str_lt(str a, str b) -> bool {
     int64 na = a.len()
     int64 nb = b.len()
@@ -57,7 +56,7 @@ func str_lt(str a, str b) -> bool {
     return na < nb
 }
 
-// A new list with `xs`'s int32 elements in ascending order.
+/// A new list with `xs`'s int32 elements in ascending order.
 pub func sort_i32(List[int32] xs) -> List[int32] {
     List[int32] a = copy_i32(xs)
     int64 n = a.len()
@@ -75,7 +74,7 @@ pub func sort_i32(List[int32] xs) -> List[int32] {
     return a
 }
 
-// A new list with `xs`'s int64 elements in ascending order.
+/// A new list with `xs`'s int64 elements in ascending order.
 pub func sort_i64(List[int64] xs) -> List[int64] {
     List[int64] a = copy_i64(xs)
     int64 n = a.len()
@@ -93,7 +92,7 @@ pub func sort_i64(List[int64] xs) -> List[int64] {
     return a
 }
 
-// A new list with `xs`'s str elements in ascending lexicographic order.
+/// A new list with `xs`'s str elements in ascending lexicographic order.
 pub func sort_str(List[str] xs) -> List[str] {
     List[str] a = copy_str(xs)
     int64 n = a.len()
@@ -111,7 +110,7 @@ pub func sort_str(List[str] xs) -> List[str] {
     return a
 }
 
-// Index of `target` in the SORTED list `xs`, or -1 if absent (binary search).
+/// Index of `target` in the SORTED list `xs`, or -1 if absent (binary search).
 pub func binary_search_i32(List[int32] xs, int32 target) -> int32 {
     int32 lo = 0
     int32 hi = cast[int32](xs.len()) - 1
@@ -130,7 +129,7 @@ pub func binary_search_i32(List[int32] xs, int32 target) -> int32 {
     return 0 - 1
 }
 
-// True when `xs` is in ascending order.
+/// True when `xs` is in ascending order.
 pub func is_sorted_i32(List[int32] xs) -> bool {
     int64 n = xs.len()
     int64 i = 1
@@ -143,7 +142,7 @@ pub func is_sorted_i32(List[int32] xs) -> bool {
     return true
 }
 
-// True when the str list `xs` is in ascending lexicographic order.
+/// True when the str list `xs` is in ascending lexicographic order.
 pub func is_sorted_str(List[str] xs) -> bool {
     int64 n = xs.len()
     int64 i = 1

@@ -1,33 +1,32 @@
-// Stenopos standard library — convert module
-// Conversions between the primitive types and strings: value → string via
-// interpolation, and string → integer via strict decimal parsers.
-//
-//   import std.convert.{int_to_str, parse_int64, bool_to_str}
-//
-// The `*_to_str` helpers wrap Stenopos's string interpolation so a conversion
-// reads as a named call. `parse_int64` and `parse_int32` accept an optional
-// sign and decimal digits, and nothing else: anything else, or a value out of
-// the type's range, is null. `is_int` reports whether a whole string is a
-// decimal integer.
-
+/// Stenopos standard library — convert module
+/// Conversions between the primitive types and strings: value → string via
+/// interpolation, and string → integer via strict decimal parsers.
+///
+///   import std.convert.{int_to_str, parse_int64, bool_to_str}
+///
+/// The `*_to_str` helpers wrap Stenopos's string interpolation so a conversion
+/// reads as a named call. `parse_int64` and `parse_int32` accept an optional
+/// sign and decimal digits, and nothing else: anything else, or a value out of
+/// the type's range, is null. `is_int` reports whether a whole string is a
+/// decimal integer.
 module std.convert
 
-// The decimal text of an int32.
+/// The decimal text of an int32.
 pub func int_to_str(int32 n) -> str {
     return "{n}"
 }
 
-// The decimal text of an int64.
+/// The decimal text of an int64.
 pub func int64_to_str(int64 n) -> str {
     return "{n}"
 }
 
-// A float64 formatted with %g (the same format println uses).
+/// A float64 formatted with %g (the same format println uses).
 pub func float_to_str(float64 x) -> str {
     return "{x}"
 }
 
-// The word "true" or "false".
+/// The word "true" or "false".
 pub func bool_to_str(bool b) -> str {
     if (b) {
         return "true"
@@ -35,8 +34,8 @@ pub func bool_to_str(bool b) -> str {
     return "false"
 }
 
-// True when `s` is a non-empty string of decimal digits, with an optional
-// leading `-` — i.e. `parse_int` would consume all of it.
+/// True when `s` is a non-empty string of decimal digits, with an optional
+/// leading `-` — i.e. `parse_int` would consume all of it.
 pub func is_int(str s) -> bool {
     int64 n = s.len()
     if (n == 0) {
@@ -59,9 +58,9 @@ pub func is_int(str s) -> bool {
     return true
 }
 
-// The int64 a decimal string spells: an optional `+` or `-`, then one or
-// more digits, and nothing else. Null for anything else, including spaces
-// and a value beyond int64 (which holds epoch seconds past 2038).
+/// The int64 a decimal string spells: an optional `+` or `-`, then one or
+/// more digits, and nothing else. Null for anything else, including spaces
+/// and a value beyond int64 (which holds epoch seconds past 2038).
 pub func parse_int64(str s) -> int64? {
     int64 n = s.len()
     int64 i = 0
@@ -98,8 +97,8 @@ pub func parse_int64(str s) -> int64? {
     return 0 - v
 }
 
-// The int32 a decimal string spells, by the rules of `parse_int64`; null
-// when it is not one or doesn't fit in an int32.
+/// The int32 a decimal string spells, by the rules of `parse_int64`; null
+/// when it is not one or doesn't fit in an int32.
 pub func parse_int32(str s) -> int32? {
     int64? v = parse_int64(s)
     if (v == null) {
@@ -112,17 +111,17 @@ pub func parse_int32(str s) -> int32? {
     return cast[int32](x)
 }
 
-// Parse a decimal string to an int32. Accepts an optional leading `-`; stops
-// at the first non-digit (so " 42 " → 0, "42abc" → 42). Returns 0 for a
-// string with no leading digits, and stops the program when the digits
-// overflow an int32. Replaced by `parse_int32`, which reports both as null.
+/// Parse a decimal string to an int32. Accepts an optional leading `-`; stops
+/// at the first non-digit (so " 42 " → 0, "42abc" → 42). Returns 0 for a
+/// string with no leading digits, and stops the program when the digits
+/// overflow an int32. Replaced by `parse_int32`, which reports both as null.
 @deprecated("use parse_int32 (null for bad input) or parse_int64")
 pub func parse_int(str s) -> int32 {
     return legacy_parse_int(s)
 }
 
-// The body of the deprecated parse_int and str_to_int (one place, so neither
-// deprecated function calls the other and warns).
+/// The body of the deprecated parse_int and str_to_int (one place, so neither
+/// deprecated function calls the other and warns).
 func legacy_parse_int(str s) -> int32 {
     int64 n = s.len()
     int64 i = 0
@@ -147,7 +146,7 @@ func legacy_parse_int(str s) -> int32 {
     return value
 }
 
-// An alias reading well as `str_to_int(s)`.
+/// An alias reading well as `str_to_int(s)`.
 @deprecated("use parse_int32 (null for bad input) or parse_int64")
 pub func str_to_int(str s) -> int32 {
     return legacy_parse_int(s)

@@ -1,18 +1,17 @@
-// Stenopos standard library — kernel.chrdev
-// Character-device registration and the VFS callback table.
-//
-// A character device exposes a /dev node that userspace can open, read, write,
-// and close. You fill in a `FileOperations` table with your handlers and hand
-// it to register_chrdev; the kernel calls back into your handlers.
-
+/// Stenopos standard library — kernel.chrdev
+/// Character-device registration and the VFS callback table.
+///
+/// A character device exposes a /dev node that userspace can open, read, write,
+/// and close. You fill in a `FileOperations` table with your handlers and hand
+/// it to register_chrdev; the kernel calls back into your handlers.
 module kernel.chrdev
 
-// struct file_operations — the kernel's VFS callback table.
-//
-// The real struct has ~30 fields; this @repr("C") layout matches the ABI for
-// the handlers a simple driver sets (owner/read/write/open/release). Leave the
-// slots you don't use as null (zeroed()), exactly like a C designated
-// initializer that only fills a few members.
+/// struct file_operations — the kernel's VFS callback table.
+///
+/// The real struct has ~30 fields; this @repr("C") layout matches the ABI for
+/// the handlers a simple driver sets (owner/read/write/open/release). Leave the
+/// slots you don't use as null (zeroed()), exactly like a C designated
+/// initializer that only fills a few members.
 @repr("C")
 struct FileOperations {
     ptr[uint8] owner            // THIS_MODULE

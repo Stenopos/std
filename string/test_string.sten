@@ -1,7 +1,6 @@
-// Tests for std.string — run with:
-//   stenopos-cli run std/string/test_string.sten
-// Prints one ok/FAIL line per check and a PASS/FAIL summary.
-
+/// Tests for std.string — run with:
+///   stenopos-cli run std/string/test_string.sten
+/// Prints one ok/FAIL line per check and a PASS/FAIL summary.
 module std.string.tests
 
 import std.string.{is_space, is_digit, is_alpha, is_alnum, is_upper, is_lower}
@@ -9,6 +8,7 @@ import std.string.{is_empty, matches_at, starts_with, ends_with, index_of, conta
 import std.string.{split, join, repeat_str, trim, trim_start, trim_end}
 import std.string.{to_upper, to_lower, pad_left, pad_right, from_code_point}
 
+/// TODO: what `expect` does.
 func expect(bool cond, str name) -> int32 {
     if (cond) {
         println("  ok   {name}")
@@ -18,6 +18,7 @@ func expect(bool cond, str name) -> int32 {
     return 1
 }
 
+/// TODO: what `expect_str` does.
 func expect_str(str got, str want, str name) -> int32 {
     if (got == want) {
         return expect(true, name)
@@ -26,6 +27,7 @@ func expect_str(str got, str want, str name) -> int32 {
     return 1
 }
 
+/// TODO: what `test_code_points` does.
 func test_code_points() -> int32 {
     int32 fails = 0
     fails += expect((from_code_point(65) ?? "") == "A", "from_code_point: ASCII")
@@ -38,6 +40,7 @@ func test_code_points() -> int32 {
     return fails
 }
 
+/// TODO: what `test_classification` does.
 func test_classification() -> int32 {
     int32 fails = 0
     fails += expect(is_space(' ') && is_space('\t') && is_space('\n'), "is_space accepts whitespace")
@@ -51,6 +54,7 @@ func test_classification() -> int32 {
     return fails
 }
 
+/// TODO: what `test_queries` does.
 func test_queries() -> int32 {
     int32 fails = 0
     fails += expect(is_empty("") && !is_empty("x"), "is_empty")
@@ -76,6 +80,7 @@ func test_queries() -> int32 {
     return fails
 }
 
+/// TODO: what `test_split_join` does.
 func test_split_join() -> int32 {
     int32 fails = 0
     List[str] parts = split("a,b,c", ",")
@@ -104,6 +109,7 @@ func test_split_join() -> int32 {
     return fails
 }
 
+/// TODO: what `test_transformations` does.
 func test_transformations() -> int32 {
     int32 fails = 0
     fails += expect_str(repeat_str("ab", 3), "ababab", "repeat_str")
@@ -122,6 +128,7 @@ func test_transformations() -> int32 {
     return fails
 }
 
+/// TODO: what `main` does.
 func main() -> void {
     int32 fails = 0
     println("std.string tests:")

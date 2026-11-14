@@ -1,13 +1,13 @@
-// Tests for std.math — run with:
-//   stenopos-cli run std/math/test_math.sten
-// Prints one ok/FAIL line per check and a PASS/FAIL summary.
-
+/// Tests for std.math — run with:
+///   stenopos-cli run std/math/test_math.sten
+/// Prints one ok/FAIL line per check and a PASS/FAIL summary.
 module std.math.tests
 
 import std.math.{pi, e, tau, abs_i32, abs_i64, abs_f64, sign_i32, sign_i64, sign_f64}
 import std.math.{min, max, clamp, is_even, is_odd, pow_int, gcd, lcm}
 import std.math.{floor, ceil, round, sqrt}
 
+/// TODO: what `expect` does.
 func expect(bool cond, str name) -> int32 {
     if (cond) {
         println("  ok   {name}")
@@ -17,11 +17,12 @@ func expect(bool cond, str name) -> int32 {
     return 1
 }
 
-// True when a and b differ by less than eps in either direction.
+/// True when a and b differ by less than eps in either direction.
 func approx(float64 a, float64 b, float64 eps) -> bool {
     return abs_f64(a - b) < eps
 }
 
+/// TODO: what `test_constants` does.
 func test_constants() -> int32 {
     int32 fails = 0
     fails += expect(approx(pi(), 3.14159265, 0.0000001), "pi value")
@@ -30,6 +31,7 @@ func test_constants() -> int32 {
     return fails
 }
 
+/// TODO: what `test_abs_sign` does.
 func test_abs_sign() -> int32 {
     int32 fails = 0
     int32 neg5 = -5
@@ -47,6 +49,7 @@ func test_abs_sign() -> int32 {
     return fails
 }
 
+/// TODO: what `test_min_max_clamp` does.
 func test_min_max_clamp() -> int32 {
     int32 fails = 0
     fails += expect(min(3, 7) == 3 && max(3, 7) == 7, "min/max int32")
@@ -60,6 +63,7 @@ func test_min_max_clamp() -> int32 {
     return fails
 }
 
+/// TODO: what `test_integer_math` does.
 func test_integer_math() -> int32 {
     int32 fails = 0
     int64 neg4 = 0
@@ -90,6 +94,7 @@ func test_integer_math() -> int32 {
     return fails
 }
 
+/// TODO: what `test_float_math` does.
 func test_float_math() -> int32 {
     int32 fails = 0
     fails += expect(approx(floor(2.7), 2.0, 0.000001), "floor positive")
@@ -115,6 +120,7 @@ func test_float_math() -> int32 {
     return fails
 }
 
+/// TODO: what `main` does.
 func main() -> void {
     int32 fails = 0
     println("std.math tests:")

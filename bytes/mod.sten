@@ -1,37 +1,36 @@
-// Stenopos standard library — bytes module
-// A byte buffer + byte helpers. Pure Stenopos, no FFI.
-//
-// A byte buffer is a plain `List[int32]`, each element in 0..255. Collections
-// are VALUE types (copy-on-write): passing a list to a function does not let the
-// function mutate the caller's list. So this module is written FUNCTIONALLY — an
-// `append_*` returns a NEW buffer with the bytes added, leaving its argument
-// untouched:
-//
-//   List[int32] buf = bytes_new()
-//   buf = append_byte(buf, 0x41)
-//   buf = append_u16_le(buf, 258)
-//
-// (You may also build a buffer directly with `list_new()` + `.push()` on your
-// OWN local list — that is your list, so it grows in place.)
-//
-// Security note: byte buffers preserve taint like any other value. A buffer
-// built by decoding/parsing tainted input (e.g. `from_str` on `@tainted` user
-// data, or bytes read off the network) stays `@tainted`; none of these functions
-// sanitize — they only move bytes around.
-
+/// Stenopos standard library — bytes module
+/// A byte buffer + byte helpers. Pure Stenopos, no FFI.
+///
+/// A byte buffer is a plain `List[int32]`, each element in 0..255. Collections
+/// are VALUE types (copy-on-write): passing a list to a function does not let the
+/// function mutate the caller's list. So this module is written FUNCTIONALLY — an
+/// `append_*` returns a NEW buffer with the bytes added, leaving its argument
+/// untouched:
+///
+///   List[int32] buf = bytes_new()
+///   buf = append_byte(buf, 0x41)
+///   buf = append_u16_le(buf, 258)
+///
+/// (You may also build a buffer directly with `list_new()` + `.push()` on your
+/// OWN local list — that is your list, so it grows in place.)
+///
+/// Security note: byte buffers preserve taint like any other value. A buffer
+/// built by decoding/parsing tainted input (e.g. `from_str` on `@tainted` user
+/// data, or bytes read off the network) stays `@tainted`; none of these functions
+/// sanitize — they only move bytes around.
 module std.bytes
 
 // ---------------------------------------------------------------------------
 // Construction
 // ---------------------------------------------------------------------------
 
-// A fresh, empty byte buffer.
+/// A fresh, empty byte buffer.
 pub func bytes_new() -> List[int32] {
     return list_new()
 }
 
-// A copy of `buf` (a new list with the same bytes). Every `append_*` builds on
-// this, so the argument is never mutated.
+/// A copy of `buf` (a new list with the same bytes). Every `append_*` builds on
+/// this, so the argument is never mutated.
 func copy_bytes(List[int32] buf) -> List[int32] {
     List[int32] out = list_new()
     for (b in buf) {
@@ -44,15 +43,15 @@ func copy_bytes(List[int32] buf) -> List[int32] {
 // Appending — each returns a NEW buffer (value semantics)
 // ---------------------------------------------------------------------------
 
-// `buf` with one byte appended, masked to 0..255 (a negative int or one above
-// 255 truncates the same way a real byte store would).
+/// `buf` with one byte appended, masked to 0..255 (a negative int or one above
+/// 255 truncates the same way a real byte store would).
 pub func append_byte(List[int32] buf, int32 b) -> List[int32] {
     List[int32] out = copy_bytes(buf)
     out.push(b & 255)
     return out
 }
 
-// `buf` with every byte of `other` appended, in order.
+/// `buf` with every byte of `other` appended, in order.
 pub func append_bytes(List[int32] buf, List[int32] other) -> List[int32] {
     List[int32] out = copy_bytes(buf)
     for (b in other) {
@@ -61,7 +60,7 @@ pub func append_bytes(List[int32] buf, List[int32] other) -> List[int32] {
     return out
 }
 
-// `buf` with the raw bytes of `s` appended.
+/// `buf` with the raw bytes of `s` appended.
 pub func append_str(List[int32] buf, str s) -> List[int32] {
     List[int32] out = copy_bytes(buf)
     int64 n = s.len()
@@ -73,17 +72,17 @@ pub func append_str(List[int32] buf, str s) -> List[int32] {
     return out
 }
 
-// `buf` with a 16-bit value appended as 2 bytes, little-endian (LSB first).
+/// `buf` with a 16-bit value appended as 2 bytes, little-endian (LSB first).
 pub func append_u16_le(List[int32] buf, int32 v) -> List[int32] {
     return append_byte(append_byte(buf, v), v >> 8)
 }
 
-// `buf` with a 16-bit value appended as 2 bytes, big-endian (MSB first).
+/// `buf` with a 16-bit value appended as 2 bytes, big-endian (MSB first).
 pub func append_u16_be(List[int32] buf, int32 v) -> List[int32] {
     return append_byte(append_byte(buf, v >> 8), v)
 }
 
-// `buf` with a 32-bit value appended as 4 bytes, little-endian (LSB first).
+/// `buf` with a 32-bit value appended as 4 bytes, little-endian (LSB first).
 pub func append_u32_le(List[int32] buf, int32 v) -> List[int32] {
     List[int32] b1 = append_byte(buf, v)
     List[int32] b2 = append_byte(b1, v >> 8)
@@ -91,7 +90,7 @@ pub func append_u32_le(List[int32] buf, int32 v) -> List[int32] {
     return append_byte(b3, v >> 24)
 }
 
-// `buf` with a 32-bit value appended as 4 bytes, big-endian (MSB first).
+/// `buf` with a 32-bit value appended as 4 bytes, big-endian (MSB first).
 pub func append_u32_be(List[int32] buf, int32 v) -> List[int32] {
     List[int32] b1 = append_byte(buf, v >> 24)
     List[int32] b2 = append_byte(b1, v >> 16)
@@ -103,22 +102,22 @@ pub func append_u32_be(List[int32] buf, int32 v) -> List[int32] {
 // Reading back multi-byte values
 // ---------------------------------------------------------------------------
 
-// A little-endian 16-bit value read at byte offset `idx` (reads idx, idx+1).
+/// A little-endian 16-bit value read at byte offset `idx` (reads idx, idx+1).
 pub func read_u16_le(List[int32] buf, int32 idx) -> int32 {
     int32 b0 = buf.get(idx)
     int32 b1 = buf.get(idx + 1)
     return b0 | (b1 << 8)
 }
 
-// A big-endian 16-bit value read at byte offset `idx`.
+/// A big-endian 16-bit value read at byte offset `idx`.
 pub func read_u16_be(List[int32] buf, int32 idx) -> int32 {
     int32 b0 = buf.get(idx)
     int32 b1 = buf.get(idx + 1)
     return (b0 << 8) | b1
 }
 
-// A little-endian 32-bit value read at byte offset `idx` (reads idx..idx+3).
-// Returned as int64 since an unsigned 32-bit value can exceed int32's range.
+/// A little-endian 32-bit value read at byte offset `idx` (reads idx..idx+3).
+/// Returned as int64 since an unsigned 32-bit value can exceed int32's range.
 pub func read_u32_le(List[int32] buf, int32 idx) -> int64 {
     int64 b0 = cast[int64](buf.get(idx))
     int64 b1 = cast[int64](buf.get(idx + 1))
@@ -127,7 +126,7 @@ pub func read_u32_le(List[int32] buf, int32 idx) -> int64 {
     return b0 | (b1 << cast[int64](8)) | (b2 << cast[int64](16)) | (b3 << cast[int64](24))
 }
 
-// A big-endian 32-bit value read at byte offset `idx`.
+/// A big-endian 32-bit value read at byte offset `idx`.
 pub func read_u32_be(List[int32] buf, int32 idx) -> int64 {
     int64 b0 = cast[int64](buf.get(idx))
     int64 b1 = cast[int64](buf.get(idx + 1))
@@ -140,7 +139,7 @@ pub func read_u32_be(List[int32] buf, int32 idx) -> int64 {
 // String conversion
 // ---------------------------------------------------------------------------
 
-// The bytes of `s`, as a fresh buffer.
+/// The bytes of `s`, as a fresh buffer.
 pub func from_str(str s) -> List[int32] {
     List[int32] out = list_new()
     int64 n = s.len()
@@ -152,8 +151,8 @@ pub func from_str(str s) -> List[int32] {
     return out
 }
 
-// True when `buf` is plain ASCII text: every byte is NUL, TAB, LF, CR or
-// printable ASCII (0x20-0x7E).
+/// True when `buf` is plain ASCII text: every byte is NUL, TAB, LF, CR or
+/// printable ASCII (0x20-0x7E).
 pub func is_text(List[int32] buf) -> bool {
     int64 n = buf.len()
     int64 i = 0
@@ -168,8 +167,8 @@ pub func is_text(List[int32] buf) -> bool {
     return true
 }
 
-// The string holding exactly the bytes in `buf` (each 0-255; a str is a byte
-// string, so any byte round-trips). Throws on an element that is not a byte.
+/// The string holding exactly the bytes in `buf` (each 0-255; a str is a byte
+/// string, so any byte round-trips). Throws on an element that is not a byte.
 pub func to_str(List[int32] buf) -> str {
     List[str] parts = list_new()
     int64 n = buf.len()
@@ -189,7 +188,7 @@ pub func to_str(List[int32] buf) -> str {
 // Comparing and slicing
 // ---------------------------------------------------------------------------
 
-// True when `a` and `b` have the same length and equal bytes at every index.
+/// True when `a` and `b` have the same length and equal bytes at every index.
 pub func bytes_eq(List[int32] a, List[int32] b) -> bool {
     int64 n = a.len()
     if (n != b.len()) {
@@ -205,9 +204,9 @@ pub func bytes_eq(List[int32] a, List[int32] b) -> bool {
     return true
 }
 
-// A new buffer holding a copy of `buf[start, end)`. Out-of-range bounds are
-// clamped (negative `start` to 0, `end` past the length to the length) rather
-// than thrown, matching `std.list`'s `take`/`drop` convention.
+/// A new buffer holding a copy of `buf[start, end)`. Out-of-range bounds are
+/// clamped (negative `start` to 0, `end` past the length to the length) rather
+/// than thrown, matching `std.list`'s `take`/`drop` convention.
 pub func slice(List[int32] buf, int32 start, int32 end) -> List[int32] {
     List[int32] out = list_new()
     int64 n = buf.len()

@@ -1,17 +1,16 @@
-// Stenopos standard library — io module
-// Line-oriented helpers over the built-in file I/O.
-//
-// The compiler already provides read_file(path) -> str and
-// write_file(path, content) -> bool as built-ins; this module adds the
-// line-based conveniences on top. Note: read_file returns "" for a missing
-// file (there is no error to catch yet), so an empty and an absent file look
-// the same. exists()/stdin/stderr helpers wait on runtime support.
-
+/// Stenopos standard library — io module
+/// Line-oriented helpers over the built-in file I/O.
+///
+/// The compiler already provides read_file(path) -> str and
+/// write_file(path, content) -> bool as built-ins; this module adds the
+/// line-based conveniences on top. Note: read_file returns "" for a missing
+/// file (there is no error to catch yet), so an empty and an absent file look
+/// the same. exists()/stdin/stderr helpers wait on runtime support.
 module std.io
 
-// Read a file and split it into lines (separated by '\n').
-// A trailing newline does not produce a final empty line.
-// A missing or empty file yields an empty list.
+/// Read a file and split it into lines (separated by '\n').
+/// A trailing newline does not produce a final empty line.
+/// A missing or empty file yields an empty list.
 @cap(File)
 pub func read_lines(str path) -> List[str] {
     List[str] lines = list_new()
@@ -32,8 +31,8 @@ pub func read_lines(str path) -> List[str] {
     return lines
 }
 
-// Write a list of lines to a file, one per line, with a trailing newline.
-// Returns true when the write succeeded.
+/// Write a list of lines to a file, one per line, with a trailing newline.
+/// Returns true when the write succeeded.
 @cap(File)
 pub func write_lines(str path, List[str] lines) -> bool {
     List[str] parts = list_new()
@@ -44,8 +43,8 @@ pub func write_lines(str path, List[str] lines) -> bool {
     return write_file(path, parts.join())
 }
 
-// Append `content` to the end of a file, creating the file if absent, in one
-// write (the file isn't read or rewritten). Returns true when it succeeded.
+/// Append `content` to the end of a file, creating the file if absent, in one
+/// write (the file isn't read or rewritten). Returns true when it succeeded.
 @cap(File)
 pub func append_file(str path, str content) -> bool {
     return fs_append(path, content) == 0

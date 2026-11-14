@@ -1,3 +1,4 @@
+/// TODO: what this module is for.
 module std.time.tests
 
 import std.time.{
@@ -6,6 +7,7 @@ import std.time.{
     days_from_civil, civil_from_days, is_leap, DateTime
 }
 
+/// TODO: what `expect` does.
 func expect(bool cond, str name) -> int32 {
     if (cond) {
         println("  ok   " + name)
@@ -15,9 +17,9 @@ func expect(bool cond, str name) -> int32 {
     return 1
 }
 
-// One moment: its RFC 3339 text, weekday/month/day-of-year, weekday number,
-// and that from_utc of its fields gives it back. Expected values are from
-// Python's datetime (proleptic Gregorian, UTC).
+/// One moment: its RFC 3339 text, weekday/month/day-of-year, weekday number,
+/// and that from_utc of its fields gives it back. Expected values are from
+/// Python's datetime (proleptic Gregorian, UTC).
 func check_moment(int64 t, str iso, str names, int32 wd) -> int32 {
     int32 fails = 0
     DateTime d = utc(t)
@@ -28,6 +30,7 @@ func check_moment(int64 t, str iso, str names, int32 wd) -> int32 {
     return fails
 }
 
+/// TODO: what `test_calendar` does.
 func test_calendar() -> int32 {
     int32 fails = 0
     fails += check_moment(cast[int64](0), "1970-01-01T00:00:00Z", "Thu Jan 001", 4)
@@ -55,6 +58,7 @@ func test_calendar() -> int32 {
     return fails
 }
 
+/// TODO: what `test_helpers` does.
 func test_helpers() -> int32 {
     int32 fails = 0
     fails += expect(floor_div(7, 2) == 3 && floor_div(cast[int64](0 - 7), 2) == cast[int64](0 - 4) && floor_div(cast[int64](0 - 8), 2) == cast[int64](0 - 4), "floor_div rounds toward minus infinity")
@@ -67,6 +71,7 @@ func test_helpers() -> int32 {
     return fails
 }
 
+/// TODO: what `test_formatting` does.
 func test_formatting() -> int32 {
     int32 fails = 0
     int64 t = from_utc(2026, 11, 9, 3, 15, 0)
@@ -80,6 +85,7 @@ func test_formatting() -> int32 {
     return fails
 }
 
+/// TODO: what `test_clocks` does.
 func test_clocks() -> int32 {
     int32 fails = 0
     int64 a = mono_ns()
@@ -99,6 +105,7 @@ func test_clocks() -> int32 {
     return fails
 }
 
+/// TODO: what `main` does.
 func main() -> void {
     int32 fails = 0
     println("std.time tests:")

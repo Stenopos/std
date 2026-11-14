@@ -1,10 +1,9 @@
-// std.tls against a local `openssl s_server` with a self-signed certificate
-// for localhost: pinning (the right pin, the same pin written differently, a
-// wrong one, a malformed one), verification (refused for a self-signed
-// certificate, accepted with it as ca_file, refused for the wrong name),
-// refusing to check nothing, and a read with a deadline. Skipped when the
-// openssl command isn't installed.
-
+/// std.tls against a local `openssl s_server` with a self-signed certificate
+/// for localhost: pinning (the right pin, the same pin written differently, a
+/// wrong one, a malformed one), verification (refused for a self-signed
+/// certificate, accepted with it as ca_file, refused for the wrong name),
+/// refusing to check nothing, and a read with a deadline. Skipped when the
+/// openssl command isn't installed.
 module std.tls.tests
 
 import std.tls.{TlsConn, TlsOptions, connect, send, recv, recv_timeout, close, verified, pinned}
@@ -12,6 +11,7 @@ import std.os.{Output, execute, run}
 import std.fs.{temp_dir, remove_all}
 import std.time.{mono_ms, sleep_ms}
 
+/// TODO: what `expect` does.
 func expect(bool cond, str name) -> int32 {
     if (cond) {
         println("  ok   " + name)
@@ -21,7 +21,7 @@ func expect(bool cond, str name) -> int32 {
     return 1
 }
 
-// The first line of the answer to a GET, or the error.
+/// The first line of the answer to a GET, or the error.
 @cap(Network)
 func get(str host, int32 port, TlsOptions o) -> str {
     try {
@@ -35,6 +35,7 @@ func get(str host, int32 port, TlsOptions o) -> str {
     }
 }
 
+/// TODO: what `main` does.
 @cap(Network)
 @cap(Process)
 @cap(File)

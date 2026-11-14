@@ -1,11 +1,11 @@
-// Tests for std.crypto.sshsig, from real `ssh-keygen -Y sign` signatures
-// (OpenSSH, an independent implementation) and invalid cases derived from them.
-
+/// Tests for std.crypto.sshsig, from real `ssh-keygen -Y sign` signatures
+/// (OpenSSH, an independent implementation) and invalid cases derived from them.
 module std.crypto.sshsig_tests
 
 import std.crypto.sshsig.{sshsig_verify}
 import std.hex.{hex_decode}
 
+/// TODO: what `check` does.
 func check(str sig, str msg_hex, str ns, str key, bool want, str name) -> int32 {
     bool got = sshsig_verify(sig, hex_decode(msg_hex), ns, key)
     if (got == want) {
@@ -16,6 +16,7 @@ func check(str sig, str msg_hex, str ns, str key, bool want, str name) -> int32 
     return 1
 }
 
+/// TODO: what `main` does.
 func main() -> void {
     int32 fails = 0
     println("std.crypto sshsig tests:")

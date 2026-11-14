@@ -1,14 +1,14 @@
-// Tests for std.logging — run with:
-//   STENOPOS_STD=. stenopos-cli run logging/test_logging.sten
-// Exercises the levels, name/parse round-trips, tagged formatting, the threshold
-// predicate, a filtering console Logger, and a filtering FileLogger (build log).
-// fatal() aborts the process, so it is exercised separately, not here.
-
+/// Tests for std.logging — run with:
+///   STENOPOS_STD=. stenopos-cli run logging/test_logging.sten
+/// Exercises the levels, name/parse round-trips, tagged formatting, the threshold
+/// predicate, a filtering console Logger, and a filtering FileLogger (build log).
+/// fatal() aborts the process, so it is exercised separately, not here.
 module std.logging.tests
 
 import std.testing.{expect, expect_eq_int, expect_eq_str, report}
 import std.logging.{Logger, FileLogger, level_name, level_from_name, level_trace, level_debug, level_info, level_warn, level_error, level_fatal, format_record, format_tagged, enabled, append_record}
 
+/// TODO: what `main` does.
 @cap(File)
 func main() -> int32 {
     int32 fails = 0

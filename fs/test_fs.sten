@@ -1,8 +1,10 @@
+/// TODO: what this module is for.
 module std.fs.tests
 
 // std.fs in a private temporary directory, removed at the end.
 import std.fs.{FileInfo, read, write_atomic, write_atomic_mode, list_dir, stat, exists, mkdir_all, rename, remove, remove_all, chmod, temp_dir, set_umask}
 
+/// TODO: what `expect` does.
 func expect(bool cond, str name) -> int32 {
     if (cond) {
         println("  ok   " + name)
@@ -12,6 +14,7 @@ func expect(bool cond, str name) -> int32 {
     return 1
 }
 
+/// TODO: what `error_of_read` does.
 @cap(File)
 func error_of_read(str path) -> str {
     try {
@@ -22,6 +25,7 @@ func error_of_read(str path) -> str {
     return ""
 }
 
+/// TODO: what `error_of_remove` does.
 @cap(File)
 func error_of_remove(str path) -> str {
     try {
@@ -32,6 +36,7 @@ func error_of_remove(str path) -> str {
     return ""
 }
 
+/// TODO: what `error_of_list` does.
 @cap(File)
 func error_of_list(str path) -> str {
     try {
@@ -42,6 +47,7 @@ func error_of_list(str path) -> str {
     return ""
 }
 
+/// TODO: what `main` does.
 @cap(File)
 func main() -> void {
     int32 fails = 0

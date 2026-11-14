@@ -1,12 +1,11 @@
-// Stenopos standard library — SSH signatures (OpenSSH PROTOCOL.sshsig).
-// Verifies the signatures `ssh-keygen -Y sign -n <namespace>` writes, for
-// ssh-ed25519 keys. Pure Stenopos, no FFI.
-//
-// A signature binds a message to a NAMESPACE (so a signature made for one
-// purpose can't be replayed for another) and to the signer's key. Verification
-// accepts only an exact match of both, and any malformed input is rejected —
-// it never aborts.
-
+/// Stenopos standard library — SSH signatures (OpenSSH PROTOCOL.sshsig).
+/// Verifies the signatures `ssh-keygen -Y sign -n <namespace>` writes, for
+/// ssh-ed25519 keys. Pure Stenopos, no FFI.
+///
+/// A signature binds a message to a NAMESPACE (so a signature made for one
+/// purpose can't be replayed for another) and to the signer's key. Verification
+/// accepts only an exact match of both, and any malformed input is rejected —
+/// it never aborts.
 module std.crypto.sshsig
 
 import std.base64.{base64_decode}
@@ -14,6 +13,7 @@ import std.crypto.ed25519.{ed25519_verify}
 import std.crypto.sha256.{sha256}
 import std.crypto.sha512.{sha512}
 
+/// TODO: what `bytes_of` does.
 func bytes_of(str s) -> List[int32] {
     List[int32] b = list_new()
     int64 i = 0
@@ -24,6 +24,7 @@ func bytes_of(str s) -> List[int32] {
     return b
 }
 
+/// TODO: what `same` does.
 func same(List[int32] a, List[int32] b) -> bool {
     if (a.len() != b.len()) {
         return false
@@ -38,6 +39,7 @@ func same(List[int32] a, List[int32] b) -> bool {
     return true
 }
 
+/// TODO: what `slice` does.
 func slice(List[int32] b, int64 from, int64 to) -> List[int32] {
     List[int32] o = list_new()
     int64 i = from
@@ -48,8 +50,8 @@ func slice(List[int32] b, int64 from, int64 to) -> List[int32] {
     return o
 }
 
-// The SSH wire `string` at `pos`: a big-endian uint32 length, then the bytes.
-// Returns the length, or -1 when the field runs past the end of `b`.
+/// The SSH wire `string` at `pos`: a big-endian uint32 length, then the bytes.
+/// Returns the length, or -1 when the field runs past the end of `b`.
 func wire_len(List[int32] b, int64 pos) -> int64 {
     if (pos < 0 || pos + 4 > b.len()) {
         return 0 - 1
@@ -61,7 +63,7 @@ func wire_len(List[int32] b, int64 pos) -> int64 {
     return n
 }
 
-// `data` as an SSH wire `string`.
+/// `data` as an SSH wire `string`.
 func wire_string(List[int32] data) -> List[int32] {
     List[int32] o = list_new()
     int64 n = data.len()
@@ -75,8 +77,8 @@ func wire_string(List[int32] data) -> List[int32] {
     return o
 }
 
-// The 32-byte key inside an ssh-ed25519 public-key blob, or empty if the blob
-// is not exactly `string "ssh-ed25519", string key[32]`.
+/// The 32-byte key inside an ssh-ed25519 public-key blob, or empty if the blob
+/// is not exactly `string "ssh-ed25519", string key[32]`.
 func ed25519_key_of(List[int32] blob) -> List[int32] {
     List[int32] none = list_new()
     int64 tn = wire_len(blob, 0)
@@ -91,8 +93,8 @@ func ed25519_key_of(List[int32] blob) -> List[int32] {
     return slice(blob, kpos + 4, kpos + 36)
 }
 
-// The public-key blob of an OpenSSH public key line ("ssh-ed25519 AAAA...
-// comment", as in a .pub file), or empty if the line is not one.
+/// The public-key blob of an OpenSSH public key line ("ssh-ed25519 AAAA...
+/// comment", as in a .pub file), or empty if the line is not one.
 pub func ssh_public_key_blob(str line) -> List[int32] {
     List[int32] none = list_new()
     List[str] parts = line.trim().split(" ")
@@ -111,7 +113,7 @@ pub func ssh_public_key_blob(str line) -> List[int32] {
     return blob
 }
 
-// The base64 body of an armored signature (between the BEGIN and END lines).
+/// The base64 body of an armored signature (between the BEGIN and END lines).
 func armor_body(str armored) -> str {
     str body = ""
     bool inside = false
@@ -128,10 +130,10 @@ func armor_body(str armored) -> str {
     return body
 }
 
-// Verify an armored SSH signature (`ssh-keygen -Y sign` output) of `msg`:
-// signed in `namespace` by the key on the OpenSSH public key line
-// `allowed_key`. True only when the signature is valid, the namespace matches
-// exactly, and the signing key is exactly that key.
+/// Verify an armored SSH signature (`ssh-keygen -Y sign` output) of `msg`:
+/// signed in `namespace` by the key on the OpenSSH public key line
+/// `allowed_key`. True only when the signature is valid, the namespace matches
+/// exactly, and the signing key is exactly that key.
 pub func sshsig_verify(str armored, List[int32] msg, str namespace, str allowed_key) -> bool {
     List[int32] want_blob = ssh_public_key_blob(allowed_key)
     if (want_blob.len() == 0) {

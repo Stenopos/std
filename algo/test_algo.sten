@@ -1,10 +1,11 @@
-// Tests for std.algo — run with:
-//   STENOPOS_STD=... stenopos run std/algo/test_algo.sten
+/// Tests for std.algo — run with:
+///   STENOPOS_STD=... stenopos run std/algo/test_algo.sten
 module std.algo.tests
 
 import std.algo.{reverse_i32, sort_i32, binary_search, unique_i32}
 import std.testing.{expect, expect_eq_int, report}
 
+/// TODO: what `main` does.
 func main() -> int32 {
     int32 fails = 0
 
