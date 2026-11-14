@@ -1,0 +1,185 @@
+// std.http: a server and a client in one program. Routing, keep-alive with
+// pipelined requests, HTTP/1.0, queries, the limits (431, 413, a slow client
+// dropped), malformed requests (400), chunked responses, URL parsing, and an
+// https request to `openssl s_server` when the openssl command is installed.
+
+module std.http.tests
+
+import std.http.{Request, Response, HttpConn, Limits, ClientRequest, Url, serve, limits, text, json, get, post, post_json, fetch, request, header_of, parse_url, parse_response, parse_request}
+import std.net.{Conn, Listener, listen_on, accept, connect, send, recv, recv_timeout, close}
+import std.tls.{pinned}
+import std.os.{Output, execute, run, exit}
+import std.fs.{temp_dir, remove_all}
+import std.time.{mono_ms, sleep_ms}
+
+func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   " + name)
+        return 0
+    }
+    println("  FAIL " + name)
+    return 1
+}
+
+@cap(Network)
+func handle(Conn c, Limits l) -> void {
+    HttpConn h = serve(c, l)
+    bool open = true
+    while (open) {
+        Request? got = h.next()
+        if (got == null) {
+            open = false
+        } else {
+            Request r = got!!
+            if (r.path == "/healthz") {
+                h.respond(text(200, "ok\n"))
+            } else if (r.path == "/echo" && r.method == "POST") {
+                h.respond(json(201, "\{\"got\": \"" + r.body + "\", \"type\": \"" + (header_of(r.headers, "content-type") ?? "") + "\"\}"))
+            } else if (r.path == "/query") {
+                h.respond(text(200, r.query))
+            } else {
+                h.respond(text(404, "no " + r.path + "\n"))
+            }
+        }
+    }
+    discard close(c)
+}
+
+@cap(Network)
+func server(Listener ls, Limits l) -> void {
+    while (true) {
+        spawn handle(accept(ls), l)
+    }
+}
+
+// A server that answers one request with a chunked body.
+@cap(Network)
+func chunked_server(Listener ls) -> void {
+    Conn c = accept(ls)
+    discard recv(c)
+    discard send(c, "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Type: text/plain\r\n\r\n5\r\nhello\r\n7;ext=1\r\n, world\r\n0\r\n\r\n")
+    discard close(c)
+}
+
+// Send `raw` on a new connection and read until the server closes it.
+@cap(Network)
+func raw_exchange(int32 port, str raw) -> str {
+    Conn c = connect("127.0.0.1", port)
+    discard send(c, raw)
+    str all = ""
+    bool more = true
+    while (more) {
+        str? got = recv_timeout(c, 3000)
+        if (got == null || got!! == "") {
+            more = false
+        } else {
+            all = all + got!!
+        }
+    }
+    discard close(c)
+    return all
+}
+
+@cap(Network)
+@cap(Process)
+@cap(File)
+func main() -> void {
+    int32 fails = 0
+    println("std.http tests:")
+    int32 port = 19000 + cast[int32](mono_ms() % 500)
+    Limits l = limits()
+    l.timeout_ms = 300
+    l.max_header_bytes = 1024
+    l.max_body_bytes = cast[int64](100)
+    spawn server(listen_on("127.0.0.1", port), l)
+    str base = "http://127.0.0.1:{port}"
+
+    Response hz = get(base + "/healthz")
+    fails += expect(hz.status == 200 && hz.body == "ok\n", "GET /healthz: {hz.status} " + hz.body.trim())
+    fails += expect((header_of(hz.headers, "CONTENT-TYPE") ?? "") == "text/plain; charset=utf-8", "headers are found in any case")
+    Response e = post(base + "/echo", "text/plain", "hi there")
+    fails += expect(e.status == 201 && e.body == "\{\"got\": \"hi there\", \"type\": \"text/plain\"\}", "POST /echo: " + e.body)
+    Response pj = post_json(base + "/echo", "x")
+    fails += expect(pj.body.index_of("application/json") >= 0, "post_json sends application/json")
+    Request pr = parse_request("POST /a/b?k=v HTTP/1.1\r\nHost: h\r\nContent-Length: 3\r\n\r\nabcdef")
+    fails += expect(pr.method == "POST" && pr.path == "/a/b" && pr.query == "k=v" && pr.body == "abc" && (header_of(pr.headers, "host") ?? "") == "h", "parse_request: method, path, query, headers, body")
+    Request junk_req = parse_request("garbage")
+    fails += expect(junk_req.method == "" && junk_req.path == "/", "parse_request on garbage: method \"\", path /")
+    Response nf = get(base + "/nope")
+    fails += expect(nf.status == 404, "an unknown path is 404")
+    Response q = get(base + "/query?a=1&b=two")
+    fails += expect(q.body == "a=1&b=two", "the query: " + q.body)
+
+    str two = raw_exchange(port, "GET /healthz HTTP/1.1\r\nHost: x\r\n\r\nGET /query?n=2 HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+    fails += expect(two.index_of("HTTP/1.1 200 OK") >= 0 && two.index_of("\r\n\r\nok\n") >= 0 && two.ends_with("\r\n\r\nn=2"), "two pipelined requests on one connection")
+    fails += expect(two.index_of("Connection: close") >= 0, "Connection: close on the last answer")
+    str old = raw_exchange(port, "GET /healthz HTTP/1.0\r\n\r\n")
+    fails += expect(old.starts_with("HTTP/1.1 200 OK") && old.index_of("Connection: close") >= 0, "HTTP/1.0 closes after one request")
+    str fill = "x"
+    while (fill.len() < 2000) {
+        fill = fill + fill
+    }
+    str big = raw_exchange(port, "GET / HTTP/1.1\r\nX-Fill: " + fill + "\r\n\r\n")
+    fails += expect(big.starts_with("HTTP/1.1 431 "), "oversized headers: 431")
+    str fat = raw_exchange(port, "POST /echo HTTP/1.1\r\nContent-Length: 5000\r\n\r\n")
+    fails += expect(fat.starts_with("HTTP/1.1 413 "), "an oversized body: 413")
+    str junk = raw_exchange(port, "HELLO\r\n\r\n")
+    fails += expect(junk.starts_with("HTTP/1.1 400 "), "a malformed request: 400")
+    int64 t0 = mono_ms()
+    str slow = raw_exchange(port, "GET /healthz HTTP/1.1\r\nHost: x\r\n")
+    fails += expect(slow == "" && mono_ms() - t0 < 2000, "a client that stops mid-request is dropped after the timeout")
+
+    int32 cport = port + 600
+    spawn chunked_server(listen_on("127.0.0.1", cport))
+    Response ch = get("http://127.0.0.1:{cport}/")
+    fails += expect(ch.body == "hello, world", "a chunked response is decoded: " + ch.body)
+
+    Url u = parse_url("https://[::1]:8443/a/b?c=d")
+    fails += expect(u.https && u.host == "::1" && u.port == 8443 && u.target == "/a/b?c=d", "parse_url with IPv6 and a port")
+    Url v = parse_url("http://example.com")
+    fails += expect(!v.https && v.host == "example.com" && v.port == 80 && v.target == "/", "parse_url defaults")
+    str bad = ""
+    try {
+        discard parse_url("ftp://x")
+    } catch (str err) {
+        bad = err
+    }
+    fails += expect(bad == "http: not an http:// or https:// URL: ftp://x", "other schemes are refused")
+    str refused = ""
+    try {
+        discard get("http://127.0.0.1:1/")
+    } catch (str err) {
+        refused = err
+    }
+    fails += expect(refused == "connect 127.0.0.1:1: connection refused", "a refused connection throws: " + refused)
+
+    if (run("openssl version > /dev/null 2>&1") == 0) {
+        str dir = temp_dir("http-test")
+        discard execute(["openssl", "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1",
+            "-nodes", "-keyout", dir + "/key.pem", "-out", dir + "/cert.pem", "-days", "1", "-subj", "/CN=localhost"])
+        Output fp = execute(["openssl", "x509", "-in", dir + "/cert.pem", "-noout", "-fingerprint", "-sha256"])
+        str pin = fp.stdout.trim().split("=").get(1)
+        int32 sport = port + 300
+        discard run("openssl s_server -accept 127.0.0.1:{sport} -cert " + dir + "/cert.pem -key " + dir + "/key.pem -www -quiet > /dev/null 2>&1 & echo $! > " + dir + "/pid")
+        ClientRequest sq = request("GET", "https://localhost:{sport}/")
+        sq.tls = pinned(pin)
+        sq.timeout_ms = 3000
+        int32 status = 0
+        int64 t1 = mono_ms()
+        while (status == 0 && mono_ms() - t1 < 5000) {
+            try {
+                status = fetch(sq).status
+            } catch (str err) {
+                sleep_ms(50)
+            }
+        }
+        fails += expect(status == 200, "https with a pinned certificate: {status}")
+        discard run("kill $(cat " + dir + "/pid)")
+        remove_all(dir)
+    }
+    if (fails > 0) {
+        fail("FAIL: {fails} check(s) failed")
+    }
+    println("PASS: all std.http checks passed")
+    exit(0)                       // the server's accept loop never ends
+}

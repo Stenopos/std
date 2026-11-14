@@ -1,6 +1,6 @@
 // Stenopos standard library — os module
 // Running programs without a shell (execute, execute_with), signals
-// (watch_signals, wait_signal), the shell when you need it (run), and the
+// (watch_signals, wait_signal, or into a channel: notify_signals), exit, the shell when you need it (run), and the
 // arguments the program was started with.
 //
 //   import std.os.{run, argc, arg, args, program_name}
@@ -132,6 +132,36 @@ pub func wait_signal(int32 ms) -> int32? {
         return null
     }
     return s
+}
+
+// Deliver `sigs` into `into` as they arrive, so a service's main loop can
+// wait for its work and for SIGTERM together:
+//
+//   chan[int32] sigs = chan()
+//   notify_signals([SIGTERM, SIGINT], sigs)
+//   while (running) {
+//       ...                                    // the service's work
+//       int32? s = sigs.recv_timeout(1000)     // or try_recv
+//       if (s != null) { running = false }
+//   }
+//
+// The runtime forwards them (no Hemerodrome waits forever, so nothing holds
+// up the exit), and stops when `into` is freed. Calling it again watches
+// more signals and moves forwarding to the new channel. Once it is in use,
+// read signals from the channel, not with wait_signal.
+@cap(Process)
+pub func notify_signals(List[int32] sigs, chan[int32] into) -> void {
+    watch_signals(sigs)
+    if (sig_forward(into) < 0) {
+        throw("notify_signals: " + os_error())
+    }
+}
+
+// Exit now with `code` (0 success), after flushing what was printed. Tasks
+// still waiting (an accept loop, a reader) don't hold the exit up, so a
+// service can finish its work on SIGTERM and then call exit(0).
+pub func exit(int32 code) -> void {
+    discard os_exit(code)
 }
 
 // ---------------------------------------------------------------------------

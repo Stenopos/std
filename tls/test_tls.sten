@@ -1,0 +1,90 @@
+// std.tls against a local `openssl s_server` with a self-signed certificate
+// for localhost: pinning (the right pin, the same pin written differently, a
+// wrong one, a malformed one), verification (refused for a self-signed
+// certificate, accepted with it as ca_file, refused for the wrong name),
+// refusing to check nothing, and a read with a deadline. Skipped when the
+// openssl command isn't installed.
+
+module std.tls.tests
+
+import std.tls.{TlsConn, TlsOptions, connect, send, recv, recv_timeout, close, verified, pinned}
+import std.os.{Output, execute, run}
+import std.fs.{temp_dir, remove_all}
+import std.time.{mono_ms, sleep_ms}
+
+func expect(bool cond, str name) -> int32 {
+    if (cond) {
+        println("  ok   " + name)
+        return 0
+    }
+    println("  FAIL " + name)
+    return 1
+}
+
+// The first line of the answer to a GET, or the error.
+@cap(Network)
+func get(str host, int32 port, TlsOptions o) -> str {
+    try {
+        TlsConn c = connect(host, port, o)
+        discard send(c, "GET / HTTP/1.0\r\nHost: " + host + "\r\n\r\n")
+        str first = recv(c)
+        close(c)
+        return first.split("\r\n").get(0)
+    } catch (str e) {
+        return "error: " + e
+    }
+}
+
+@cap(Network)
+@cap(Process)
+@cap(File)
+func main() -> void {
+    if (run("openssl version > /dev/null 2>&1") != 0) {
+        println("PASS: skipped (no openssl command)")
+        return
+    }
+    int32 fails = 0
+    println("std.tls tests:")
+    str dir = temp_dir("tls-test")
+    Output mk = execute(["openssl", "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1",
+        "-nodes", "-keyout", dir + "/key.pem", "-out", dir + "/cert.pem", "-days", "1",
+        "-subj", "/CN=localhost", "-addext", "subjectAltName=DNS:localhost"])
+    fails += expect(mk.code == 0, "a self-signed certificate for localhost")
+    Output fp = execute(["openssl", "x509", "-in", dir + "/cert.pem", "-noout", "-fingerprint", "-sha256"])
+    str pin = fp.stdout.trim().split("=").get(1)
+    int32 port = 18000 + cast[int32](mono_ms() % 1000)
+    discard run("openssl s_server -accept 127.0.0.1:{port} -cert " + dir + "/cert.pem -key " + dir + "/key.pem -www -quiet > /dev/null 2>&1 & echo $! > " + dir + "/pid")
+    // Wait for it to listen.
+    str first = ""
+    int64 t0 = mono_ms()
+    while (!first.starts_with("HTTP") && mono_ms() - t0 < 5000) {
+        sleep_ms(50)
+        first = get("localhost", port, pinned(pin))
+    }
+    fails += expect(first == "HTTP/1.0 200 ok", "the right pin connects: " + first)
+    str bare = pin.replace(":", "").to_lower()
+    fails += expect(get("localhost", port, pinned(bare)) == "HTTP/1.0 200 ok", "the pin in lower case, without colons")
+    str wrong = get("localhost", port, pinned("00" + pin.substring(2, pin.len())))
+    fails += expect(wrong.starts_with("error: tls localhost:{port}: the certificate doesn't match the pin (it is sha256 " + bare), "a wrong pin is refused, naming the real one: " + wrong)
+    str bad = get("localhost", port, pinned("abc"))
+    fails += expect(bad.ends_with("the pin must be a SHA-256 in hex (64 digits, colons allowed)"), "a malformed pin: " + bad)
+    str selfs = get("localhost", port, verified())
+    fails += expect(selfs.ends_with("certificate not trusted: self-signed certificate"), "verified() refuses a self-signed certificate: " + selfs)
+    TlsOptions ca = TlsOptions { verify: true, ca_file: dir + "/cert.pem", pin_sha256: "" }
+    fails += expect(get("localhost", port, ca) == "HTTP/1.0 200 ok", "verified against ca_file")
+    str name = get("127.0.0.1", port, ca)
+    fails += expect(name.ends_with("certificate not trusted: IP address mismatch"), "the wrong name is refused: " + name)
+    str none = get("localhost", port, TlsOptions { verify: false, ca_file: "", pin_sha256: "" })
+    fails += expect(none.ends_with("nothing would be checked (use verified() or pinned(...))"), "checking nothing is refused")
+    TlsConn c = connect("localhost", port, pinned(pin))
+    int64 t1 = mono_ms()
+    str? quiet = recv_timeout(c, 200)
+    fails += expect(quiet == null && mono_ms() - t1 >= 190, "recv_timeout: null after 200 ms of silence")
+    close(c)
+    discard run("kill $(cat " + dir + "/pid)")
+    remove_all(dir)
+    if (fails > 0) {
+        fail("FAIL: {fails} check(s) failed")
+    }
+    println("PASS: all std.tls checks passed")
+}

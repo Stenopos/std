@@ -1,67 +1,617 @@
-// Stenopos standard library — http module
-// A tiny HTTP/1.1 surface: parse a request line and build a response. Pure string
-// work over std.net's byte streams — no I/O of its own, so no capabilities. Good
-// enough for a real "hello world" web service; a fuller client/server (headers,
-// chunked bodies, keep-alive) layers on top as a blessed package.
-
+// Stenopos standard library — http module (k8s-todo item 7)
+//
+// HTTP/1.1, server and client, on std.net and std.tls (ADR-0043 §3.11).
+// Every function that touches the network declares @cap(Network);
+// parse_request and the response builders are plain string work.
+//
+// A server: accept connections, one Hemerodrome each. `next` reads the next
+// request (keep-alive and pipelining included) and answers malformed or
+// oversized ones itself (400, 413, 431); null means the client is done.
+//
+//   Listener l = listen(8080)
+//   while (true) {
+//       spawn handle(accept(l))
+//   }
+//   @cap(Network)
+//   func handle(Conn c) -> void {
+//       HttpConn h = serve(c, limits())
+//       bool open = true
+//       while (open) {
+//           Request? r = h.next()
+//           if (r == null) {
+//               open = false
+//           } else if (r!!.path == "/healthz") {
+//               h.respond(text(200, "ok\n"))
+//           } else {
+//               h.respond(text(404, "not found\n"))
+//           }
+//       }
+//       discard close(c)
+//   }
+//
+// A client: `get(url)`, `post(url, content_type, body)`, `post_json`, or `fetch` for
+// anything else (method, headers, a deadline, how to check an https server):
+//
+//   Response r = get("https://gitea.tuxsmash.com/api/v1/version")
+//   ClientRequest q = request("GET", "https://10.0.0.1/proxy/network/api/self")
+//   q.tls = pinned("5f:3a:...")
+//   q.headers.push("Cookie: TOKEN=...")
+//   Response s = fetch(q)
+//   str? kind = header_of(s.headers, "content-type")
+//
+// A failure (refused, timed out, an untrusted certificate, a malformed
+// answer) throws, saying why; an HTTP error status is a Response.
 module std.http
 
-// The parts of an HTTP request line this module extracts: "GET /path HTTP/1.1".
+import std.net.{Conn, connect_timeout, recv_timeout, send, close}
+import std.tls.{TlsConn, TlsOptions, verified}
+import std.tls as secure
+import std.convert.{parse_int32, parse_int64}
+
+// ---------------------------------------------------------------------------
+// Messages
+// ---------------------------------------------------------------------------
+
+// A request, as a server receives it.
 pub struct Request {
-    pub str method
-    pub str path
+    pub str method            // "GET", "POST"...
+    pub str path              // "/api/items", without the query
+    pub str query             // "a=1&b=2" (no "?"), "" if none
+    pub List[str] headers     // "Name: value", as sent
+    pub str body
+    pub bool keep_alive       // the client wants the connection kept open
 }
 
-// Parse the request line (the first line) of a raw request. A malformed request
-// yields method "" and path "/", so callers can route without crashing.
-pub func parse_request(str raw) -> Request {
-    // The request line ends at the first CRLF (or LF, being lenient).
-    int64 nl = raw.index_of("\r\n")
-    if (nl < 0) {
-        nl = raw.index_of("\n")
-    }
-    str line = raw
-    if (nl >= 0) {
-        line = raw.substring(0, nl)
-    }
-    List[str] parts = line.split(" ")
-    str method = ""
-    str path = "/"
-    if (parts.len() >= 1) {
-        method = parts.get(0)
-    }
-    if (parts.len() >= 2) {
-        path = parts.get(1)
-    }
-    Request r = Request { method: method, path: path }
-    return r
+// A response: built by a server (text, json, response), or received by a
+// client.
+pub struct Response {
+    pub int32 status          // 200, 404...
+    pub List[str] headers     // "Name: value"
+    pub str body
 }
 
-// The reason phrase for a status code (the common ones).
+// The value of header `name` (any case) in `headers`, or null.
+pub func header_of(List[str] headers, str name) -> str? {
+    str want = name.to_lower()
+    for (h in headers) {
+        int64 colon = h.index_of(":")
+        if (colon > 0 && h.substring(0, colon).trim().to_lower() == want) {
+            return h.substring(colon + 1, h.len()).trim()
+        }
+    }
+    return null
+}
+
+// A response with `body` and its content type.
+pub func response(int32 status, str content_type, str body) -> Response {
+    List[str] h = list_new()
+    h.push("Content-Type: " + content_type)
+    return Response { status: status, headers: h, body: body }
+}
+
+// A plain-text response.
+pub func text(int32 status, str body) -> Response {
+    return response(status, "text/plain; charset=utf-8", body)
+}
+
+// A JSON response (`body` is JSON already: see std.json).
+pub func json(int32 status, str body) -> Response {
+    return response(status, "application/json", body)
+}
+
+// The reason phrase for a status code.
 pub func reason(int32 status) -> str {
-    if (status == 200) {
-        return "OK"
-    }
-    if (status == 400) {
-        return "Bad Request"
-    }
-    if (status == 404) {
-        return "Not Found"
-    }
-    if (status == 500) {
-        return "Internal Server Error"
-    }
-    return "OK"
+    if (status == 200) { return "OK" }
+    if (status == 201) { return "Created" }
+    if (status == 204) { return "No Content" }
+    if (status == 301) { return "Moved Permanently" }
+    if (status == 302) { return "Found" }
+    if (status == 304) { return "Not Modified" }
+    if (status == 400) { return "Bad Request" }
+    if (status == 401) { return "Unauthorized" }
+    if (status == 403) { return "Forbidden" }
+    if (status == 404) { return "Not Found" }
+    if (status == 405) { return "Method Not Allowed" }
+    if (status == 408) { return "Request Timeout" }
+    if (status == 409) { return "Conflict" }
+    if (status == 411) { return "Length Required" }
+    if (status == 413) { return "Content Too Large" }
+    if (status == 429) { return "Too Many Requests" }
+    if (status == 431) { return "Request Header Fields Too Large" }
+    if (status == 500) { return "Internal Server Error" }
+    if (status == 501) { return "Not Implemented" }
+    if (status == 502) { return "Bad Gateway" }
+    if (status == 503) { return "Service Unavailable" }
+    if (status == 504) { return "Gateway Timeout" }
+    return "Status"
 }
 
-// Build a complete HTTP/1.1 response with a text/plain body and Connection:
-// close (one request per connection — the simple model std.net serves).
-pub func response(int32 status, str body) -> str {
-    int32 n = cast[int32](body.len())
-    str head = "HTTP/1.1 {status} " + reason(status) + "\r\n"
-    head = head + "Content-Type: text/plain\r\n"
-    head = head + "Content-Length: {n}\r\n"
-    head = head + "Connection: close\r\n"
-    head = head + "\r\n"
-    return head + body
+// Parse one whole request from `raw` (the request line, headers, and a body
+// of Content-Length bytes, or the rest). A malformed request line gives
+// method "" and path "/", so a caller can route it without crashing.
+pub func parse_request(str raw) -> Request {
+    int64 end = raw.index_of("\r\n\r\n")
+    str head = raw
+    str rest = ""
+    if (end >= 0) {
+        head = raw.substring(0, end)
+        rest = raw.substring(end + 4, raw.len())
+    }
+    List[str] lines = head.split("\r\n")
+    List[str] first = lines.get(0).split(" ")
+    str method = ""
+    str target = "/"
+    if (first.len() >= 2) {
+        method = first.get(0)
+        target = first.get(1)
+    }
+    List[str] headers = list_new()
+    int64 i = 1
+    while (i < lines.len()) {
+        if (lines.get(i).index_of(":") > 0) {
+            headers.push(lines.get(i))
+        }
+        i = i + 1
+    }
+    str body = rest
+    str? cl = header_of(headers, "content-length")
+    if (cl != null) {
+        int64 n = parse_int64(cl!!) ?? cast[int64](0)
+        if (n >= 0 && n <= rest.len()) {
+            body = rest.substring(0, n)
+        }
+    }
+    str path = target
+    str query = ""
+    int64 q = target.index_of("?")
+    if (q >= 0) {
+        path = target.substring(0, q)
+        query = target.substring(q + 1, target.len())
+    }
+    bool keep = (header_of(headers, "connection") ?? "").to_lower() != "close"
+    return Request { method: method, path: path, query: query, headers: headers, body: body, keep_alive: keep }
+}
+
+// ---------------------------------------------------------------------------
+// Server
+// ---------------------------------------------------------------------------
+
+// What a server accepts from a client.
+pub struct Limits {
+    pub int32 max_header_bytes    // request line and headers (431 beyond)
+    pub int64 max_body_bytes      // the body (413 beyond)
+    pub int32 timeout_ms          // for each read: a slow or idle client is dropped
+}
+
+// 16 KiB of headers, a 1 MiB body, 10 s between reads.
+pub func limits() -> Limits {
+    return Limits { max_header_bytes: 16384, max_body_bytes: cast[int64](1048576), timeout_ms: 10000 }
+}
+
+// One client connection, read request by request.
+pub struct HttpConn {
+    pub Conn conn
+    pub Limits limits
+    str buf                       // received, not yet part of a request
+    bool open                     // false once the client is done
+
+    // The next request, or null when the client has closed, gone quiet for
+    // longer than the limit, asked to close after its last request, or sent
+    // something this answered itself (400, 413, 431, 501).
+    @cap(Network)
+    pub func next() -> Request? {
+        if (!this.open) {
+            return null
+        }
+        int64 end = this.buf.index_of("\r\n\r\n")
+        while (end < 0) {
+            if (this.buf.len() > cast[int64](this.limits.max_header_bytes)) {
+                this.refuse(431, "request headers too large\n")
+                return null
+            }
+            if (!this.more()) {
+                return null
+            }
+            end = this.buf.index_of("\r\n\r\n")
+        }
+        if (end > cast[int64](this.limits.max_header_bytes)) {
+            this.refuse(431, "request headers too large\n")
+            return null
+        }
+        List[str] lines = this.buf.substring(0, end).split("\r\n")
+        this.buf = this.buf.substring(end + 4, this.buf.len())
+        List[str] first = lines.get(0).split(" ")
+        if (first.len() != 3 || !first.get(2).starts_with("HTTP/1.")) {
+            this.refuse(400, "malformed request line\n")
+            return null
+        }
+        List[str] headers = list_new()
+        int64 i = 1
+        while (i < lines.len()) {
+            str h = lines.get(i)
+            if (h.index_of(":") <= 0) {
+                this.refuse(400, "malformed header\n")
+                return null
+            }
+            headers.push(h)
+            i = i + 1
+        }
+        if (header_of(headers, "transfer-encoding") != null) {
+            this.refuse(501, "chunked request bodies are not supported: send Content-Length\n")
+            return null
+        }
+        int64 length = 0
+        str? cl = header_of(headers, "content-length")
+        if (cl != null) {
+            int64? n = parse_int64(cl!!)
+            if (n == null || n!! < 0) {
+                this.refuse(400, "bad Content-Length\n")
+                return null
+            }
+            length = n!!
+        }
+        if (length > this.limits.max_body_bytes) {
+            this.refuse(413, "request body too large\n")
+            return null
+        }
+        while (this.buf.len() < length) {
+            if (!this.more()) {
+                return null
+            }
+        }
+        str body = this.buf.substring(0, length)
+        this.buf = this.buf.substring(length, this.buf.len())
+        str target = first.get(1)
+        str path = target
+        str query = ""
+        int64 q = target.index_of("?")
+        if (q >= 0) {
+            path = target.substring(0, q)
+            query = target.substring(q + 1, target.len())
+        }
+        str conn = (header_of(headers, "connection") ?? "").to_lower()
+        bool keep = conn != "close"
+        if (first.get(2) == "HTTP/1.0") {
+            keep = conn == "keep-alive"
+        }
+        if (!keep) {
+            this.open = false
+        }
+        return Request { method: first.get(0), path: path, query: query, headers: headers, body: body, keep_alive: keep }
+    }
+
+    // Answer the request `next` returned. Content-Length is set from the
+    // body, and Connection: close when the connection ends after this.
+    @cap(Network)
+    pub func respond(Response r) -> void {
+        str out = "HTTP/1.1 {r.status} " + reason(r.status) + "\r\n"
+        for (h in r.headers) {
+            str lower = h.to_lower()
+            if (!lower.starts_with("content-length:") && !lower.starts_with("connection:")) {
+                out = out + h + "\r\n"
+            }
+        }
+        out = out + "Content-Length: {r.body.len()}\r\n"
+        if (!this.open) {
+            out = out + "Connection: close\r\n"
+        }
+        try {
+            discard send(this.conn, out + "\r\n" + r.body)
+        } catch (str e) {
+            this.open = false             // the client went away
+        }
+    }
+
+    // Read more into buf: false (and closed) at the end, a timeout or an error.
+    @cap(Network)
+    func more() -> bool {
+        try {
+            str? got = recv_timeout(this.conn, this.limits.timeout_ms)
+            if (got == null || got!! == "") {
+                this.open = false
+                return false
+            }
+            this.buf = this.buf + got!!
+            return true
+        } catch (str e) {
+            this.open = false
+            return false
+        }
+    }
+
+    @cap(Network)
+    func refuse(int32 status, str why) -> void {
+        this.open = false
+        this.respond(text(status, why))
+    }
+}
+
+// Serve HTTP on an accepted connection.
+pub func serve(Conn c, Limits l) -> HttpConn {
+    return HttpConn { conn: c, limits: l, buf: "", open: true }
+}
+
+// ---------------------------------------------------------------------------
+// Client
+// ---------------------------------------------------------------------------
+
+// A request to send: `request(method, url)` fills in the usual, then set what
+// you need.
+pub struct ClientRequest {
+    pub str method
+    pub str url               // http://host[:port]/path or https://...
+    pub List[str] headers     // "Name: value"; Host, Content-Length and
+                              // Connection are added
+    pub str body
+    pub int32 timeout_ms      // for the whole exchange
+    pub TlsOptions tls        // how to check an https server (verified())
+}
+
+// A request with no headers or body, a 30 s deadline, and https checked
+// against the system's CAs.
+pub func request(str method, str url) -> ClientRequest {
+    List[str] h = list_new()
+    return ClientRequest { method: method, url: url, headers: h, body: "", timeout_ms: 30000, tls: verified() }
+}
+
+// GET `url`.
+@cap(Network)
+pub func get(str url) -> Response {
+    return fetch(request("GET", url))
+}
+
+// POST `body` to `url`.
+@cap(Network)
+pub func post(str url, str content_type, str body) -> Response {
+    ClientRequest q = request("POST", url)
+    q.headers.push("Content-Type: " + content_type)
+    q.body = body
+    return fetch(q)
+}
+
+// POST a JSON document to `url`.
+@cap(Network)
+pub func post_json(str url, str body) -> Response {
+    return post(url, "application/json", body)
+}
+
+// Where a URL points.
+pub struct Url {
+    pub bool https
+    pub str host
+    pub int32 port
+    pub str target            // path and query
+}
+
+// Split an http:// or https:// URL. Throws for anything else.
+pub func parse_url(str url) -> Url {
+    bool https = false
+    str rest = ""
+    if (url.starts_with("https://")) {
+        https = true
+        rest = url.substring(8, url.len())
+    } else if (url.starts_with("http://")) {
+        rest = url.substring(7, url.len())
+    } else {
+        throw("http: not an http:// or https:// URL: " + url)
+    }
+    str hostport = rest
+    str target = "/"
+    int64 slash = rest.index_of("/")
+    if (slash >= 0) {
+        hostport = rest.substring(0, slash)
+        target = rest.substring(slash, rest.len())
+    }
+    int32 port = 80
+    if (https) {
+        port = 443
+    }
+    str host = hostport
+    if (hostport.starts_with("[")) {             // [::1]:8080
+        int64 close_br = hostport.index_of("]")
+        if (close_br < 0) {
+            throw("http: bad address in URL: " + url)
+        }
+        host = hostport.substring(1, close_br)
+        if (close_br + 1 < hostport.len()) {
+            port = parse_int32(hostport.substring(close_br + 2, hostport.len())) ?? 0
+        }
+    } else {
+        int64 colon = hostport.index_of(":")
+        if (colon >= 0) {
+            host = hostport.substring(0, colon)
+            port = parse_int32(hostport.substring(colon + 1, hostport.len())) ?? 0
+        }
+    }
+    if (host == "" || port <= 0 || port > 65535) {
+        throw("http: bad host or port in URL: " + url)
+    }
+    return Url { https: https, host: host, port: port, target: target }
+}
+
+// Send `q` and read the whole response (the connection is closed after it).
+@cap(Network)
+pub func fetch(ClientRequest q) -> Response {
+    Url u = parse_url(q.url)
+    str hosthdr = u.host
+    if (u.host.index_of(":") >= 0) {
+        hosthdr = "[" + u.host + "]"
+    }
+    if ((u.https && u.port != 443) || (!u.https && u.port != 80)) {
+        hosthdr = hosthdr + ":{u.port}"
+    }
+    str msg = q.method + " " + u.target + " HTTP/1.1\r\nHost: " + hosthdr + "\r\n"
+    bool agent = false
+    for (h in q.headers) {
+        str lower = h.to_lower()
+        if (!lower.starts_with("host:") && !lower.starts_with("content-length:") && !lower.starts_with("connection:")) {
+            msg = msg + h + "\r\n"
+        }
+        if (lower.starts_with("user-agent:")) {
+            agent = true
+        }
+    }
+    if (!agent) {
+        msg = msg + "User-Agent: stenopos\r\n"
+    }
+    if (q.body != "" || q.method == "POST" || q.method == "PUT" || q.method == "PATCH") {
+        msg = msg + "Content-Length: {q.body.len()}\r\n"
+    }
+    msg = msg + "Connection: close\r\n\r\n" + q.body
+    str raw = ""
+    if (u.https) {
+        raw = exchange_tls(u, q, msg)
+    } else {
+        raw = exchange_tcp(u, q, msg)
+    }
+    return parse_response(raw, q.method == "HEAD", q.url)
+}
+
+@cap(Network)
+func exchange_tcp(Url u, ClientRequest q, str msg) -> str {
+    Conn c = connect_timeout(u.host, u.port, q.timeout_ms)
+    str all = ""
+    try {
+        discard send(c, msg)
+        bool more = true
+        while (more) {
+            str? got = recv_timeout(c, q.timeout_ms)
+            if (got == null) {
+                throw("timed out after {q.timeout_ms} ms")
+            }
+            if (got!! == "") {
+                more = false
+            } else {
+                all = all + got!!
+            }
+        }
+    } catch (str e) {
+        discard close(c)
+        throw("http " + q.url + ": " + e)
+    }
+    discard close(c)
+    return all
+}
+
+@cap(Network)
+func exchange_tls(Url u, ClientRequest q, str msg) -> str {
+    TlsConn c = secure.connect_timeout(u.host, u.port, q.tls, q.timeout_ms)
+    str all = ""
+    try {
+        discard secure.send(c, msg)
+        bool more = true
+        while (more) {
+            str? got = secure.recv_timeout(c, q.timeout_ms)
+            if (got == null) {
+                throw("timed out after {q.timeout_ms} ms")
+            }
+            if (got!! == "") {
+                more = false
+            } else {
+                all = all + got!!
+            }
+        }
+    } catch (str e) {
+        secure.close(c)
+        throw("http " + q.url + ": " + e)
+    }
+    secure.close(c)
+    return all
+}
+
+// A whole response as received: the status line, headers, and a body that
+// is chunked, Content-Length long, or the rest.
+pub func parse_response(str raw, bool head, str url) -> Response {
+    int64 end = raw.index_of("\r\n\r\n")
+    if (end < 0) {
+        throw("http " + url + ": the server's answer ended before its headers did")
+    }
+    List[str] lines = raw.substring(0, end).split("\r\n")
+    List[str] first = lines.get(0).split(" ")
+    if (first.len() < 2 || !first.get(0).starts_with("HTTP/1.")) {
+        throw("http " + url + ": not an HTTP response")
+    }
+    int32? status = parse_int32(first.get(1))
+    if (status == null) {
+        throw("http " + url + ": bad status line: " + lines.get(0))
+    }
+    List[str] headers = list_new()
+    int64 i = 1
+    while (i < lines.len()) {
+        headers.push(lines.get(i))
+        i = i + 1
+    }
+    str rest = raw.substring(end + 4, raw.len())
+    str body = rest
+    if (head || status!! == 204 || status!! == 304) {
+        body = ""
+    } else if ((header_of(headers, "transfer-encoding") ?? "").to_lower().index_of("chunked") >= 0) {
+        body = dechunk(rest, url)
+    } else {
+        str? cl = header_of(headers, "content-length")
+        if (cl != null) {
+            int64 n = parse_int64(cl!!) ?? cast[int64](0 - 1)
+            if (n < 0 || n > rest.len()) {
+                throw("http " + url + ": the body is shorter than its Content-Length")
+            }
+            body = rest.substring(0, n)
+        }
+    }
+    return Response { status: status!!, headers: headers, body: body }
+}
+
+// Undo chunked transfer encoding.
+func dechunk(str s, str url) -> str {
+    str out = ""
+    int64 at = 0
+    while (true) {
+        int64 eol = s.substring(at, s.len()).index_of("\r\n")
+        if (eol < 0) {
+            throw("http " + url + ": a chunk size is cut off")
+        }
+        str size_text = s.substring(at, at + eol)
+        int64 semi = size_text.index_of(";")
+        if (semi >= 0) {
+            size_text = size_text.substring(0, semi)
+        }
+        int64 n = hex_value(size_text.trim())
+        if (n < 0) {
+            throw("http " + url + ": bad chunk size: " + size_text)
+        }
+        at = at + eol + 2
+        if (n == 0) {
+            return out
+        }
+        if (at + n > s.len()) {
+            throw("http " + url + ": a chunk is cut off")
+        }
+        out = out + s.substring(at, at + n)
+        at = at + n + 2
+    }
+    return out
+}
+
+func hex_value(str t) -> int64 {
+    if (t == "" || t.len() > 15) {
+        return 0 - 1
+    }
+    int64 v = 0
+    int64 i = 0
+    while (i < t.len()) {
+        int32 c = t.byte_at(i)
+        int64 d = 0 - 1
+        if (c >= 48 && c <= 57) {
+            d = cast[int64](c - 48)
+        } else if (c >= 97 && c <= 102) {
+            d = cast[int64](c - 87)
+        } else if (c >= 65 && c <= 70) {
+            d = cast[int64](c - 55)
+        }
+        if (d < 0) {
+            return 0 - 1
+        }
+        v = v * 16 + d
+        i = i + 1
+    }
+    return v
 }
