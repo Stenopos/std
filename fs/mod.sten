@@ -7,6 +7,7 @@
 //   FileInfo i = stat(path)                       // size, mtime, mode, kind
 //   str? text = read(path)                        // null: no such file
 //   write_atomic(path, text)                      // never a half-written file
+//   append(log, line + "\n")                      // one write, never rewrites
 //   mkdir_all(dir, 0o700)
 //   rename(a, b); remove(path); remove_all(dir); chmod(path, 0o600)
 //   str tmp = temp_dir("backup")                  // mode 0700
@@ -122,6 +123,16 @@ pub func exists(str path) -> bool {
 pub func mkdir_all(str dir, int32 mode) -> void {
     if (fs_mkdir_all(dir, mode) < 0) {
         fail_on("mkdir_all", dir)
+    }
+}
+
+// Append `text` to `path`, creating it if needed (0666 less the umask), in
+// one write: two writers each land whole, and a growing log costs only what
+// is added.
+@cap(File)
+pub func append(str path, str text) -> void {
+    if (fs_append(path, text) < 0) {
+        fail_on("append", path)
     }
 }
 

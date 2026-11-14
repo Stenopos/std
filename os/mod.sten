@@ -1,6 +1,6 @@
 // Stenopos standard library — os module
 // Running programs without a shell (execute, execute_with), signals
-// (watch_signals, wait_signal, or into a channel: notify_signals), exit, the shell when you need it (run), and the
+// (watch_signals, wait_signal, or into a channel: notify_signals), exit, exit_grace, the shell when you need it (run), and the
 // arguments the program was started with.
 //
 //   import std.os.{run, argc, arg, args, program_name}
@@ -155,6 +155,16 @@ pub func notify_signals(List[int32] sigs, chan[int32] into) -> void {
     if (sig_forward(into) < 0) {
         throw("notify_signals: " + os_error())
     }
+}
+
+// How long a program may wait for its tasks after main returns: past `ms`
+// milliseconds, it says which wait ran out and exits with code 124 (as
+// `timeout` does), cleaning up as exit() does. Unset, main's return waits
+// for every task, however long: work a program started is finished, never
+// cut off. A service under Kubernetes might set 25000 (SIGKILL comes 30 s
+// after SIGTERM); a batch job leaves it unset.
+pub func exit_grace(int32 ms) -> void {
+    discard os_exit_grace(ms)
 }
 
 // Exit now with `code` (0 success), after flushing what was printed. Tasks

@@ -133,8 +133,7 @@ pub func fatal(str msg) -> void {
 // file. Returns true on success. The standalone persistent-log / build-log sink.
 @cap(File)
 pub func append_record(str path, int32 level, str msg) -> bool {
-    str combined = read_file(path) + format_record(level, msg) + "\n"
-    return write_file(path, combined)
+    return fs_append(path, format_record(level, msg) + "\n") == 0
 }
 
 // A console logger: filters by `threshold` and prints to stdout, prefixing each
@@ -188,8 +187,7 @@ pub struct FileLogger {
             return false
         }
         str line = format_tagged(level, this.tag, msg)
-        str combined = read_file(this.path) + line + "\n"
-        return write_file(this.path, combined)
+        return fs_append(this.path, line + "\n") == 0     // one write: concurrent loggers keep every line
     }
 
     @cap(File)

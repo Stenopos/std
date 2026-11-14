@@ -44,12 +44,9 @@ pub func write_lines(str path, List[str] lines) -> bool {
     return write_file(path, parts.join())
 }
 
-// Append `content` to the end of a file, creating the file if absent.
-// Returns true when the write succeeded.
-// (Implemented as read + rewrite until the runtime grows an append mode —
-// fine for small files, not for logs written in a loop.)
+// Append `content` to the end of a file, creating the file if absent, in one
+// write (the file isn't read or rewritten). Returns true when it succeeded.
 @cap(File)
 pub func append_file(str path, str content) -> bool {
-    str combined = read_file(path) + content
-    return write_file(path, combined)
+    return fs_append(path, content) == 0
 }
