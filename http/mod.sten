@@ -261,7 +261,44 @@ func content_length(List[str] headers) -> int64 {
     return found
 }
 
-/// Is `v` "HTTP/1.0" or "HTTP/1.1"?
+/// What is wrong with a header line a program wants to send, or "": a CR, LF
+// or NUL would end the line early and let the rest pose as another header
+// or another message (response or request splitting, review RV-C4); and it
+// needs a token name before its colon.
+func outgoing_header_problem(str h) -> str {
+    int64 colon = h.index_of(":")
+    int64 i = 0
+    while (i < h.len()) {
+        int32 c = h.byte_at(i)
+        if (c == 13 || c == 10 || c == 0) {
+            str name = "?"
+            if (colon > 0 && colon < i) {
+                name = h.substring(0, colon)
+            }
+            return "the header `" + name + "` contains a CR, LF or NUL"
+        }
+        i = i + 1
+    }
+    if (colon <= 0 || !is_token(h.substring(0, colon))) {
+        return "`" + h + "` is not a `Name: value` header"
+    }
+    return ""
+}
+
+// Is `t` usable as a request target: no space and no control character?
+func clean_target(str t) -> bool {
+    int64 i = 0
+    while (i < t.len()) {
+        int32 c = t.byte_at(i)
+        if (c <= 32 || c == 127) {
+            return false
+        }
+        i = i + 1
+    }
+    return t != ""
+}
+
+// Is `v` "HTTP/1.0" or "HTTP/1.1"?
 func http_version(str v) -> bool {
     return v == "HTTP/1.1" || v == "HTTP/1.0"
 }
@@ -393,6 +430,23 @@ pub struct HttpConn {
     /// body, and Connection: close when the connection ends after this.
     @cap(Network)
     pub func respond(Response r) -> void {
+        // A header with a CR or LF in it (most likely a value taken from the
+        // request) would split the response. Sending a 500 instead, and saying
+        // why on stderr, keeps the service running (throwing would end it, and
+        // let any client end it). Review RV-C4.
+        for (h in r.headers) {
+            str bad = outgoing_header_problem(h)
+            if (bad != "") {
+                eprintln("std.http: not sent, a 500 instead: " + bad)
+                this.respond(text(500, "internal server error\n"))
+                return
+            }
+        }
+        if (r.status < 100 || r.status > 999) {
+            eprintln("std.http: not sent, a 500 instead: status {r.status} is not three digits")
+            this.respond(text(500, "internal server error\n"))
+            return
+        }
         str out = "HTTP/1.1 {r.status} " + reason(r.status) + "\r\n"
         for (h in r.headers) {
             str lower = h.to_lower()
@@ -615,6 +669,21 @@ pub func parse_url(str url) -> Url {
 @cap(Network)
 pub func fetch(ClientRequest q) -> Response {
     Url u = parse_url(q.url)
+    // Nothing the program passes may add lines to the request (request
+    // splitting, review RV-C4): the method is a token, the target has no
+    // space or control character, each header is one `Name: value` line.
+    if (!is_token(q.method)) {
+        throw("http " + q.url + ": `" + q.method + "` is not a method")
+    }
+    if (!clean_target(u.target) || !clean_target(u.host)) {
+        throw("http: the URL contains a space or a control character (encode it: %20, %0D...)")
+    }
+    for (h in q.headers) {
+        str bad = outgoing_header_problem(h)
+        if (bad != "") {
+            throw("http " + q.url + ": " + bad)
+        }
+    }
     str hosthdr = u.host
     if (u.host.index_of(":") >= 0) {
         hosthdr = "[" + u.host + "]"

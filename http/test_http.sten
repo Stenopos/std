@@ -39,6 +39,10 @@ func handle(Conn c, Limits l) -> void {
                 h.respond(json(201, "\{\"got\": \"" + r.body + "\", \"type\": \"" + (header_of(r.headers, "content-type") ?? "") + "\"\}"))
             } else if (r.path == "/query") {
                 h.respond(text(200, r.query))
+            } else if (r.path == "/echo-header") {
+                Response resp = text(200, "ok\n")
+                resp.headers.push("X-Echo: " + r.query.replace("NL", "\r\n"))
+                h.respond(resp)
             } else {
                 h.respond(text(404, "no " + r.path + "\n"))
             }
@@ -161,6 +165,27 @@ func main() -> void {
     fails += expect(throws_parse("HTTP/1.1 2000 OK\r\n\r\n"), "a four-digit status is refused")
     Response nob = parse_response("HTTP/1.1 204 No Content\r\nTransfer-Encoding: chunked\r\n\r\n", false, "x")
     fails += expect(nob.status == 204 && nob.body == "", "a 204 has no body, whatever its headers say")
+
+    // Nothing a program sends may add lines to a message (review RV-C4).
+    str split_url = ""
+    try {
+        discard get(base + "/x HTTP/1.1\r\nHost: a\r\n\r\nGET /admin")
+    } catch (str err) {
+        split_url = err
+    }
+    fails += expect(split_url.index_of("control character") >= 0, "a URL with CR LF is refused before sending: " + split_url)
+    str split_hdr = ""
+    try {
+        ClientRequest sq0 = request("GET", base + "/healthz")
+        sq0.headers.push("X-A: 1\r\nX-Injected: yes")
+        discard fetch(sq0)
+    } catch (str err) {
+        split_hdr = err
+    }
+    fails += expect(split_hdr.index_of("contains a CR, LF or NUL") >= 0, "a header with CR LF is refused before sending: " + split_hdr)
+    Response echoed = get(base + "/echo-header?aNLSet-Cookie:%20x=1")
+    fails += expect(echoed.status == 500 && header_of(echoed.headers, "set-cookie") == null, "a response header with CR LF becomes a 500, never a split response")
+    fails += expect(get(base + "/echo-header?plain").status == 200, "the server keeps serving after refusing one")
 
     int32 cport = port + 600
     spawn chunked_server(listen_on("127.0.0.1", cport))
