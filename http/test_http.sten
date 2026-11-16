@@ -5,7 +5,8 @@
 /// https request to `openssl s_server` when the openssl command is installed.
 module std.http.tests
 
-import std.http.{Request, Response, HttpConn, Limits, ClientRequest, Url, serve, limits, text, json, get, post, post_json, fetch, request, header_of, parse_url, parse_response, parse_request}
+import std.http.{Request, Response, HttpConn, Limits, Url, serve, limits, text, json, header_of, parse_url, parse_response, parse_request}
+import std.http.client.{ClientRequest, get, post, post_json, fetch, request}
 import std.net.{Conn, Listener, listen_on, accept, connect, send, recv, recv_timeout, close}
 import std.tls.{pinned}
 import std.os.{Output, execute, run, exit}

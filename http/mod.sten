@@ -1,6 +1,6 @@
 /// Stenopos standard library — http module (k8s-todo item 7)
 ///
-/// HTTP/1.1, server and client, on std.net and std.tls (ADR-0043 §3.11).
+/// HTTP/1.1: messages and the server, on std.net (ADR-0043 §3.11).
 /// Every function that touches the network declares @cap(Network);
 /// parse_request and the response builders are plain string work.
 ///
@@ -29,23 +29,12 @@
 ///       discard close(c)
 ///   }
 ///
-/// A client: `get(url)`, `post(url, content_type, body)`, `post_json`, or `fetch` for
-/// anything else (method, headers, a deadline, how to check an https server):
-///
-///   Response r = get("https://gitea.tuxsmash.com/api/v1/version")
-///   ClientRequest q = request("GET", "https://10.0.0.1/proxy/network/api/self")
-///   q.tls = pinned("5f:3a:...")
-///   q.headers.push("Cookie: TOKEN=...")
-///   Response s = fetch(q)
-///   str? kind = header_of(s.headers, "content-type")
-///
-/// A failure (refused, timed out, an untrusted certificate, a malformed
-/// answer) throws, saying why; an HTTP error status is a Response.
+/// The client (`get`, `post`, `post_json`, `fetch`) is std.http.client: it
+/// speaks https, so only programs that import it link OpenSSL. A server
+/// needs this module alone.
 module std.http
 
-import std.net.{Conn, connect_timeout, recv_timeout, send, close}
-import std.tls.{TlsConn, TlsOptions, verified}
-import std.tls as secure
+import std.net.{Conn, recv_timeout, send, close}
 import std.convert.{parse_int32, parse_int64}
 
 // ---------------------------------------------------------------------------
@@ -296,6 +285,25 @@ func clean_target(str t) -> bool {
         i = i + 1
     }
     return t != ""
+}
+
+// What is wrong with a request a program wants to send, or "": the method
+// must be a token, the target and host free of spaces and control
+// characters, each header one `Name: value` line (std.http.client's check).
+pub func outgoing_request_problem(str method, str target, str host, List[str] headers) -> str {
+    if (!is_token(method)) {
+        return "`" + method + "` is not a method"
+    }
+    if (!clean_target(target) || !clean_target(host)) {
+        return "the URL contains a space or a control character (encode it: %20, %0D...)"
+    }
+    for (h in headers) {
+        str bad = outgoing_header_problem(h)
+        if (bad != "") {
+            return bad
+        }
+    }
+    return ""
 }
 
 // Is `v` "HTTP/1.0" or "HTTP/1.1"?
@@ -568,50 +576,10 @@ pub func serve(Conn c, Limits l) -> HttpConn {
 }
 
 // ---------------------------------------------------------------------------
-// Client
+// URLs and responses (the client itself is std.http.client)
 // ---------------------------------------------------------------------------
 
-/// A request to send: `request(method, url)` fills in the usual, then set what
-/// you need.
-pub struct ClientRequest {
-    pub str method
-    pub str url               // http://host[:port]/path or https://...
-    pub List[str] headers     // "Name: value"; Host, Content-Length and
-                              // Connection are added
-    pub str body
-    pub int32 timeout_ms      // for the whole exchange
-    pub TlsOptions tls        // how to check an https server (verified())
-}
-
-/// A request with no headers or body, a 30 s deadline, and https checked
-/// against the system's CAs.
-pub func request(str method, str url) -> ClientRequest {
-    List[str] h = list_new()
-    return ClientRequest { method: method, url: url, headers: h, body: "", timeout_ms: 30000, tls: verified() }
-}
-
-/// GET `url`.
-@cap(Network)
-pub func get(str url) -> Response {
-    return fetch(request("GET", url))
-}
-
-/// POST `body` to `url`.
-@cap(Network)
-pub func post(str url, str content_type, str body) -> Response {
-    ClientRequest q = request("POST", url)
-    q.headers.push("Content-Type: " + content_type)
-    q.body = body
-    return fetch(q)
-}
-
-/// POST a JSON document to `url`.
-@cap(Network)
-pub func post_json(str url, str body) -> Response {
-    return post(url, "application/json", body)
-}
-
-/// Where a URL points.
+// Where a URL points.
 pub struct Url {
     pub bool https
     pub str host
@@ -663,113 +631,6 @@ pub func parse_url(str url) -> Url {
         throw("http: bad host or port in URL: " + url)
     }
     return Url { https: https, host: host, port: port, target: target }
-}
-
-/// Send `q` and read the whole response (the connection is closed after it).
-@cap(Network)
-pub func fetch(ClientRequest q) -> Response {
-    Url u = parse_url(q.url)
-    // Nothing the program passes may add lines to the request (request
-    // splitting, review RV-C4): the method is a token, the target has no
-    // space or control character, each header is one `Name: value` line.
-    if (!is_token(q.method)) {
-        throw("http " + q.url + ": `" + q.method + "` is not a method")
-    }
-    if (!clean_target(u.target) || !clean_target(u.host)) {
-        throw("http: the URL contains a space or a control character (encode it: %20, %0D...)")
-    }
-    for (h in q.headers) {
-        str bad = outgoing_header_problem(h)
-        if (bad != "") {
-            throw("http " + q.url + ": " + bad)
-        }
-    }
-    str hosthdr = u.host
-    if (u.host.index_of(":") >= 0) {
-        hosthdr = "[" + u.host + "]"
-    }
-    if ((u.https && u.port != 443) || (!u.https && u.port != 80)) {
-        hosthdr = hosthdr + ":{u.port}"
-    }
-    str msg = q.method + " " + u.target + " HTTP/1.1\r\nHost: " + hosthdr + "\r\n"
-    bool agent = false
-    for (h in q.headers) {
-        str lower = h.to_lower()
-        if (!lower.starts_with("host:") && !lower.starts_with("content-length:") && !lower.starts_with("connection:")) {
-            msg = msg + h + "\r\n"
-        }
-        if (lower.starts_with("user-agent:")) {
-            agent = true
-        }
-    }
-    if (!agent) {
-        msg = msg + "User-Agent: stenopos\r\n"
-    }
-    if (q.body != "" || q.method == "POST" || q.method == "PUT" || q.method == "PATCH") {
-        msg = msg + "Content-Length: {q.body.len()}\r\n"
-    }
-    msg = msg + "Connection: close\r\n\r\n" + q.body
-    str raw = ""
-    if (u.https) {
-        raw = exchange_tls(u, q, msg)
-    } else {
-        raw = exchange_tcp(u, q, msg)
-    }
-    return parse_response(raw, q.method == "HEAD", q.url)
-}
-
-/// TODO: what `exchange_tcp` does.
-@cap(Network)
-func exchange_tcp(Url u, ClientRequest q, str msg) -> str {
-    Conn c = connect_timeout(u.host, u.port, q.timeout_ms)
-    str all = ""
-    try {
-        discard send(c, msg)
-        bool more = true
-        while (more) {
-            str? got = recv_timeout(c, q.timeout_ms)
-            if (got == null) {
-                throw("timed out after {q.timeout_ms} ms")
-            }
-            if (got!! == "") {
-                more = false
-            } else {
-                all = all + got!!
-            }
-        }
-    } catch (str e) {
-        discard close(c)
-        throw("http " + q.url + ": " + e)
-    }
-    discard close(c)
-    return all
-}
-
-/// TODO: what `exchange_tls` does.
-@cap(Network)
-func exchange_tls(Url u, ClientRequest q, str msg) -> str {
-    TlsConn c = secure.connect_timeout(u.host, u.port, q.tls, q.timeout_ms)
-    str all = ""
-    try {
-        discard secure.send(c, msg)
-        bool more = true
-        while (more) {
-            str? got = secure.recv_timeout(c, q.timeout_ms)
-            if (got == null) {
-                throw("timed out after {q.timeout_ms} ms")
-            }
-            if (got!! == "") {
-                more = false
-            } else {
-                all = all + got!!
-            }
-        }
-    } catch (str e) {
-        secure.close(c)
-        throw("http " + q.url + ": " + e)
-    }
-    secure.close(c)
-    return all
 }
 
 /// A whole response as received: the status line, headers, and a body that

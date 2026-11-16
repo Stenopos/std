@@ -1,9 +1,10 @@
 /// Stenopos standard library — tls module (k8s-todo item 6)
 ///
-/// TLS client connections, with certificate pinning. Uses the system's
-/// OpenSSL (3.x or 1.1), loaded the first time a program connects: install
-/// libssl3 (Debian: `apt-get install libssl3`; it comes with ca-certificates).
-/// Every function declares @cap(Network).
+/// TLS client connections, with certificate pinning. TLS 1.2 and 1.3 only
+/// (ADR-0046 §2.4). OpenSSL 3 is linked into a program that imports this
+/// module, and into no other: it must be installed where the program is
+/// built and where it runs (Debian: `libssl3`, which comes with
+/// ca-certificates). Every function declares @cap(Network).
 ///
 ///   TlsConn c = connect("gitea.tuxsmash.com", 443, verified())   // CAs + name
 ///   TlsConn u = connect("10.0.0.1", 443, pinned("5f:3a:..."))     // a self-signed
