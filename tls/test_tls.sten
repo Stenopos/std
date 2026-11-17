@@ -48,8 +48,8 @@ func main() -> void {
     println("std.tls tests:")
     str dir = temp_dir("tls-test")
     Output mk = execute(["openssl", "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1",
-        "-nodes", "-keyout", dir + "/key.pem", "-out", dir + "/cert.pem", "-days", "1",
-        "-subj", "/CN=localhost", "-addext", "subjectAltName=DNS:localhost"])
+            "-nodes", "-keyout", dir + "/key.pem", "-out", dir + "/cert.pem", "-days", "1",
+            "-subj", "/CN=localhost", "-addext", "subjectAltName=DNS:localhost"])
     fails += expect(mk.code == 0, "a self-signed certificate for localhost")
     Output fp = execute(["openssl", "x509", "-in", dir + "/cert.pem", "-noout", "-fingerprint", "-sha256"])
     str pin = fp.stdout.trim().split("=").get(1)

@@ -25,14 +25,12 @@ import std.net.{Conn, connect_timeout, recv_timeout, send, close}
 import std.tls.{TlsConn, TlsOptions, verified}
 import std.tls as secure
 
-
 /// A request to send: `request(method, url)` fills in the usual, then set what
 /// you need.
 pub struct ClientRequest {
     pub str method
     pub str url               // http://host[:port]/path or https://...
-    pub List[str] headers     // "Name: value"; Host, Content-Length and
-                              // Connection are added
+    pub List[str] headers     // "Name: value"; Host, Content-Length, Connection are added
     pub str body
     pub int32 timeout_ms      // for the whole exchange
     pub TlsOptions tls        // how to check an https server (verified())

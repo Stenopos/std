@@ -167,7 +167,10 @@ pub func parse_request(str raw) -> Request {
 // ambiguous is refused rather than guessed at.
 // ---------------------------------------------------------------------------
 
-/// A bare CR, a lone LF or a NUL in a header block, or "".
+/// A bare CR, a lone LF, a NUL or another control byte in a header block,
+/// or "". RFC 9110 5.5 and RFC 9112 4 allow no control byte but tab in a
+/// start line or a field value; refusing them here means no header is read
+/// differently because `trim` dropped one (`Content-Length: 1<CAN>` is not 1).
 func head_problem(str head) -> str {
     int64 n = head.len()
     int64 i = 0
@@ -181,6 +184,9 @@ func head_problem(str head) -> str {
         }
         if (c == 10 && (i == 0 || head.byte_at(i - 1) != 13)) {
             return "a bare LF in the headers"
+        }
+        if ((c < 32 && c != 9 && c != 10 && c != 13) || c == 127) {
+            return "a control byte in the headers"
         }
         i = i + 1
     }
@@ -505,12 +511,7 @@ pub struct HttpConn {
             if (sl == null) {
                 return null
             }
-            str size_text = sl!!
-            int64 semi = size_text.index_of(";")
-            if (semi >= 0) {
-                size_text = size_text.substring(0, semi)
-            }
-            int64 size = hex_value(size_text.trim())
+            int64 size = chunk_size(sl!!)
             if (size < 0) {
                 this.refuse(400, "bad chunk size\n")
                 return null
@@ -699,14 +700,10 @@ func dechunk(str s, str url) -> str {
         if (eol < 0) {
             throw("http " + url + ": a chunk size is cut off")
         }
-        str size_text = s.substring(at, at + eol)
-        int64 semi = size_text.index_of(";")
-        if (semi >= 0) {
-            size_text = size_text.substring(0, semi)
-        }
-        int64 n = hex_value(size_text.trim())
+        str size_line = s.substring(at, at + eol)
+        int64 n = chunk_size(size_line)
         if (n < 0) {
-            throw("http " + url + ": bad chunk size: " + size_text)
+            throw("http " + url + ": bad chunk size: " + size_line)
         }
         at = at + eol + 2
         if (n == 0) {
@@ -724,7 +721,31 @@ func dechunk(str s, str url) -> str {
     return out
 }
 
-/// TODO: what `hex_value` does.
+/// The size on a chunk-size line (RFC 9112 7.1: `chunk-size [chunk-ext]`,
+/// the CRLF already cut off), or -1 when the line is not one. The size is
+/// bare hex digits; only spaces and tabs may come between it and a `;`
+/// extension, and no control byte but tab may appear anywhere, so a stray
+/// CR or other control byte is refused rather than trimmed away.
+func chunk_size(str line) -> int64 {
+    int64 i = 0
+    while (i < line.len()) {
+        int32 c = line.byte_at(i)
+        if ((c < 32 && c != 9) || c == 127) {
+            return 0 - 1
+        }
+        i = i + 1
+    }
+    int64 end = line.index_of(";")
+    if (end < 0) {
+        end = line.len()
+    }
+    while (end > 0 && (line.byte_at(end - 1) == 32 || line.byte_at(end - 1) == 9)) {
+        end = end - 1
+    }
+    return hex_value(line.substring(0, end))
+}
+
+/// The value of 1 to 15 hex digits (either case), or -1 for anything else.
 func hex_value(str t) -> int64 {
     if (t == "" || t.len() > 15) {
         return 0 - 1
