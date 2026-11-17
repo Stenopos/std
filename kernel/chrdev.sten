@@ -13,7 +13,7 @@ module kernel.chrdev
 /// slots you don't use as null (zeroed()), exactly like a C designated
 /// initializer that only fills a few members.
 @repr("C")
-struct FileOperations {
+pub struct FileOperations {
     ptr[uint8] owner            // THIS_MODULE
     ptr[uint8] llseek
     ptr[uint8] read             // ssize_t (*)(struct file*, char __user*, size_t, loff_t*)

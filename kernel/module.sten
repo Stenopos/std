@@ -9,7 +9,7 @@
 module kernel.module
 
 // Return values for a module's init function.
-const int32 MODULE_OK = 0        // loaded successfully
+pub const int32 MODULE_OK = 0        // loaded successfully
 
 // A GPL license is REQUIRED for full kernel API access; without it the kernel
 // taints and hides GPL-only ("_GPL") symbols. Declare exactly one license.

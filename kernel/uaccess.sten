@@ -17,11 +17,19 @@ extern "C" func copy_to_user(ptr[uint8] to, ptr[uint8] from, uint64 n) -> uint64
 extern "C" func copy_from_user(ptr[uint8] to, ptr[uint8] from, uint64 n) -> uint64
 
 /// True if the whole buffer copied to user space successfully.
-func copy_to_user_ok(ptr[uint8] to, ptr[uint8] from, uint64 n) -> bool {
-    return copy_to_user(to, from, n) == 0
+pub func copy_to_user_ok(ptr[uint8] to, ptr[uint8] from, uint64 n) -> bool {
+    uint64 left = 0
+    unsafe {
+        left = copy_to_user(to, from, n)
+    }
+    return left == 0
 }
 
 /// True if the whole buffer copied from user space successfully.
-func copy_from_user_ok(ptr[uint8] to, ptr[uint8] from, uint64 n) -> bool {
-    return copy_from_user(to, from, n) == 0
+pub func copy_from_user_ok(ptr[uint8] to, ptr[uint8] from, uint64 n) -> bool {
+    uint64 left = 0
+    unsafe {
+        left = copy_from_user(to, from, n)
+    }
+    return left == 0
 }
