@@ -18,11 +18,11 @@
 /// with len, and list a table's keys with keys.
 ///
 /// Supported: comments; bare, quoted and dotted keys; [tables] and
-/// [[arrays of tables]]; basic and literal strings (one line); decimal
-/// integers (with `_` separators); booleans; arrays (over several lines, with
-/// comments and a trailing comma); inline tables. Not supported, and reported
-/// as an error rather than misread: multi-line strings, floats, dates and
-/// times, and hexadecimal/octal/binary integers.
+/// [[arrays of tables]]; basic and literal strings (one line); integers in
+/// decimal, hexadecimal (`0x`), octal (`0o`) and binary (`0b`), with `_`
+/// separators; booleans; arrays (over several lines, with comments and a
+/// trailing comma); inline tables. Not supported, and reported as an error
+/// rather than misread: multi-line strings, floats, dates and times.
 ///
 /// Every error names its line. Security: a parsed document is untrusted input.
 module std.toml
@@ -48,6 +48,8 @@ pub struct Toml {
     // How the table at the same index was made: 1 by a [header] or as an
     // inline table (it can't be opened again), 0 implicitly by a longer key.
     pub List[int32] closed
+    // The line each path was written on (for messages that point at it).
+    pub List[int32] lines
     // "" when the document was read; otherwise "line N: what is wrong".
     pub str error
 
@@ -62,6 +64,15 @@ pub struct Toml {
             i += 1
         }
         return -1
+    }
+
+    /// The line `path` was written on, or 0 if it is absent.
+    pub func line_of(str path) -> int32 {
+        int32 i = this.find(path)
+        if (i < 0) {
+            return 0
+        }
+        return this.lines.get(i)
     }
 
     /// Is there a value at `path`?
@@ -248,6 +259,20 @@ func is_digit(int32 c) -> bool {
     return c >= '0' && c <= '9'
 }
 
+/// The value of `c` as a hexadecimal digit (also octal and binary), or -1.
+func radix_digit(int32 c) -> int64 {
+    if (c >= '0' && c <= '9') {
+        return cast[int64](c - '0')
+    }
+    if (c >= 'a' && c <= 'f') {
+        return cast[int64](c - 'a' + 10)
+    }
+    if (c >= 'A' && c <= 'F') {
+        return cast[int64](c - 'A' + 10)
+    }
+    return -1
+}
+
 /// The reader: a cursor over the source, building the document.
 struct Reader {
     str s
@@ -290,6 +315,7 @@ struct Reader {
         this.doc.kinds.push(kind)
         this.doc.values.push(value)
         this.doc.closed.push(closed)
+        this.doc.lines.push(this.line)
     }
 
     /// Spaces and tabs.
@@ -520,7 +546,11 @@ struct Reader {
             this.i += 1
         }
         if (this.peek() == '0' && (this.at(1) == 'x' || this.at(1) == 'o' || this.at(1) == 'b')) {
-            this.fail_at("hexadecimal, octal and binary integers are not supported")
+            if (this.i > start) {
+                this.fail_at("a hexadecimal, octal or binary integer has no sign")
+                return
+            }
+            this.read_radix(path)
             return
         }
         // TOML forbids leading zeros (`007`): another reader would refuse the
@@ -553,6 +583,50 @@ struct Reader {
         int64? v = decimal_int64(digits)
         if (v == null) {
             this.fail_at("the integer " + this.s.substring(start, this.i) + " does not fit in 64 bits")
+            return
+        }
+        this.add(path, TOML_INT, "{v}", 0)
+    }
+
+    /// `0x...`, `0o...` or `0b...`: digits of that base, `_` between them,
+    /// up to the largest int64 (TOML's integers are 64-bit and signed).
+    func read_radix(str path) -> void {
+        int64 start = this.i
+        int32 kind = this.at(1)
+        int64 base = 16
+        if (kind == 'o') {
+            base = 8
+        } else if (kind == 'b') {
+            base = 2
+        }
+        this.i += 2
+        int64 largest = 9223372036854775807
+        int64 v = 0
+        bool any = false
+        bool going = true
+        while (going) {
+            int32 c = this.peek()
+            int64 d = radix_digit(c)
+            if (d >= 0 && d < base) {
+                if (v > (largest - d) / base) {
+                    this.fail_at("the integer " + this.s.substring(start, this.i + 1) + "... does not fit in 64 bits")
+                    return
+                }
+                v = v * base + d
+                any = true
+                this.i += 1
+            } else if (c == '_' && any && radix_digit(this.at(1)) >= 0 && radix_digit(this.at(1)) < base) {
+                this.i += 1
+            } else {
+                going = false
+            }
+        }
+        if (!any) {
+            this.fail_at("expected digits after " + this.s.substring(start, start + 2))
+            return
+        }
+        if (is_bare_char(this.peek())) {
+            this.fail_at("`" + this.s.substring(this.i, this.i + 1) + "` is not a digit of " + this.s.substring(start, start + 2))
             return
         }
         this.add(path, TOML_INT, "{v}", 0)
@@ -717,7 +791,7 @@ struct Reader {
 /// Read a TOML document. On a mistake, `error` holds "line N: ..." and the
 /// paths read so far are kept.
 pub func parse_toml(str src) -> Toml {
-    Toml doc = Toml { paths: list_new(), kinds: list_new(), values: list_new(), closed: list_new(), error: "" }
+    Toml doc = Toml { paths: list_new(), kinds: list_new(), values: list_new(), closed: list_new(), lines: list_new(), error: "" }
     Reader r = Reader { s: src, i: 0, line: 1, doc: doc, table: "" }
     r.skip_all()
     while (r.peek() != -1 && !r.failed()) {

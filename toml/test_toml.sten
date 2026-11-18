@@ -161,7 +161,10 @@ func test_errors() -> int32 {
     f += expect_error("t = \{ x = 1 \}\n[t]\n", "defined twice", "a header over an inline table")
     f += expect_error("x = 1.5\n", "floats are not supported", "a float")
     f += expect_error("d = 2026-10-27\n", "dates and times are not supported", "a date")
-    f += expect_error("h = 0xff\n", "hexadecimal", "a hex integer")
+    f += expect_error("h = +0xff\n", "has no sign", "a signed hex integer")
+    f += expect_error("h = 0x\n", "expected digits after 0x", "a hex prefix alone")
+    f += expect_error("h = 0b102\n", "`2` is not a digit of 0b", "a binary integer with a 2")
+    f += expect_error("h = 0x8000_0000_0000_0000\n", "does not fit in 64 bits", "a hex overflow")
     f += expect_error("z = 007\n", "leading zeros", "an integer with leading zeros")
     f += expect_error("z = -0_1\n", "leading zeros", "a signed integer with a leading zero")
     f += expect_error("s = \"\"\"long\"\"\"\n", "multi-line strings", "a multi-line string")
@@ -174,9 +177,25 @@ func test_errors() -> int32 {
     return f
 }
 
+/// Integers in other bases, and the line each key is on.
+func test_radix_and_lines() -> int32 {
+    println("radix and lines")
+    Toml t = parse_toml("[memory]\nram = \{ origin = 0x8000_0000, size = 0o777 \}\n\nmask = 0b1010\nbig = 0x7FFF_FFFF_FFFF_FFFF\n")
+    int32 f = expect_str(t.error, "", "the document reads")
+    f += expect(int_at(t, "memory.ram.origin") == 2147483648, "0x8000_0000")
+    f += expect(int_at(t, "memory.ram.size") == 511, "0o777")
+    f += expect(int_at(t, "memory.mask") == 10, "0b1010")
+    f += expect(int_at(t, "memory.big") == 9223372036854775807, "the largest hex int64")
+    f += expect(t.line_of("memory") == 1, "a table's line")
+    f += expect(t.line_of("memory.ram.origin") == 2, "an inline table key's line")
+    f += expect(t.line_of("memory.mask") == 4, "a key's line after a blank line")
+    f += expect(t.line_of("nope") == 0, "an absent key's line is 0")
+    return f
+}
+
 /// TODO: what `main` does.
 func main() -> int32 {
-    int32 failed = test_scalars() + test_escapes() + test_tables() + test_dotted_and_quoted() + test_arrays() + test_array_of_tables() + test_errors()
+    int32 failed = test_radix_and_lines() + test_scalars() + test_escapes() + test_tables() + test_dotted_and_quoted() + test_arrays() + test_array_of_tables() + test_errors()
     if (failed == 0) {
         println("PASS")
         return 0
