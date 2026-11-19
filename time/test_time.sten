@@ -26,7 +26,7 @@ func check_moment(int64 t, str iso, str names, int32 wd) -> int32 {
     fails += expect(rfc3339(t) == iso, "{t} is " + iso + " (got " + rfc3339(t) + ")")
     fails += expect(format(d, "%a %b %j") == names, "{t} is " + names)
     fails += expect(d.weekday == wd, "{t} weekday {wd}")
-    fails += expect(from_utc(d.year, cast[int64](d.month), cast[int64](d.day), cast[int64](d.hour), cast[int64](d.minute), cast[int64](d.second)) == t, "{t} round-trips through from_utc")
+    fails += expect(from_utc(d.year, d.month, d.day, d.hour, d.minute, d.second) == t, "{t} round-trips through from_utc")
     return fails
 }
 
@@ -34,7 +34,7 @@ func check_moment(int64 t, str iso, str names, int32 wd) -> int32 {
 func test_calendar() -> int32 {
     int32 fails = 0
     fails += check_moment(cast[int64](0), "1970-01-01T00:00:00Z", "Thu Jan 001", 4)
-    fails += check_moment(cast[int64](-1), "1969-12-31T23:59:59Z", "Wed Dec 365", 3)
+    fails += check_moment(-1, "1969-12-31T23:59:59Z", "Wed Dec 365", 3)
     fails += check_moment(cast[int64](951782400), "2000-02-29T00:00:00Z", "Tue Feb 060", 2)
     fails += check_moment(cast[int64](2147483648), "2038-01-19T03:14:08Z", "Tue Jan 019", 2)
     fails += check_moment(cast[int64](4102444800), "2100-01-01T00:00:00Z", "Fri Jan 001", 5)
@@ -61,10 +61,10 @@ func test_calendar() -> int32 {
 /// TODO: what `test_helpers` does.
 func test_helpers() -> int32 {
     int32 fails = 0
-    fails += expect(floor_div(7, 2) == 3 && floor_div(cast[int64](0 - 7), 2) == cast[int64](0 - 4) && floor_div(cast[int64](0 - 8), 2) == cast[int64](0 - 4), "floor_div rounds toward minus infinity")
+    fails += expect(floor_div(7, 2) == 3 && floor_div((0 - 7), 2) == (0 - 4) && floor_div((0 - 8), 2) == (0 - 4), "floor_div rounds toward minus infinity")
     fails += expect(is_leap(2000) && is_leap(2024) && !is_leap(1900) && !is_leap(2100) && !is_leap(2026), "is_leap")
     fails += expect(days_from_civil(1970, 1, 1) == 0 && days_from_civil(2000, 3, 1) == 11017, "days_from_civil")
-    List[int64] c = civil_from_days(cast[int64](0 - 1))
+    List[int64] c = civil_from_days(0 - 1)
     fails += expect(c.get(0) == 1969 && c.get(1) == 12 && c.get(2) == 31, "civil_from_days(-1) is 1969-12-31")
     fails += expect(from_utc(2026, 13, 1, 0, 0, 0) == from_utc(2027, 1, 1, 0, 0, 0), "month 13 rolls over to January")
     fails += expect(from_utc(2026, 11, 9, 3, 15, 60) == from_utc(2026, 11, 9, 3, 16, 0), "second 60 rolls over")
@@ -99,7 +99,7 @@ func test_clocks() -> int32 {
     fails += expect(mono_ms() >= a / 1000000, "mono_ms is the same clock as mono_ns")
     // Local time is UTC shifted by the zone's offset at that moment.
     DateTime l = local(u)
-    fails += expect(from_utc(l.year, cast[int64](l.month), cast[int64](l.day), cast[int64](l.hour), cast[int64](l.minute), cast[int64](l.second)) - u == cast[int64](l.offset), "local() is UTC plus its offset")
+    fails += expect(from_utc(l.year, l.month, l.day, l.hour, l.minute, l.second) - u == l.offset, "local() is UTC plus its offset")
     fails += expect(rfc3339_local(u).len() == 25, "rfc3339_local has a +hh:mm offset")
     fails += expect(format_local(u, "%H") == format(l, "%H"), "format_local uses local()")
     return fails

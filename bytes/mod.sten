@@ -119,19 +119,19 @@ pub func read_u16_be(List[int32] buf, int32 idx) -> int32 {
 /// A little-endian 32-bit value read at byte offset `idx` (reads idx..idx+3).
 /// Returned as int64 since an unsigned 32-bit value can exceed int32's range.
 pub func read_u32_le(List[int32] buf, int32 idx) -> int64 {
-    int64 b0 = cast[int64](buf.get(idx))
-    int64 b1 = cast[int64](buf.get(idx + 1))
-    int64 b2 = cast[int64](buf.get(idx + 2))
-    int64 b3 = cast[int64](buf.get(idx + 3))
+    int64 b0 = buf.get(idx)
+    int64 b1 = buf.get(idx + 1)
+    int64 b2 = buf.get(idx + 2)
+    int64 b3 = buf.get(idx + 3)
     return b0 | (b1 << cast[int64](8)) | (b2 << cast[int64](16)) | (b3 << cast[int64](24))
 }
 
 /// A big-endian 32-bit value read at byte offset `idx`.
 pub func read_u32_be(List[int32] buf, int32 idx) -> int64 {
-    int64 b0 = cast[int64](buf.get(idx))
-    int64 b1 = cast[int64](buf.get(idx + 1))
-    int64 b2 = cast[int64](buf.get(idx + 2))
-    int64 b3 = cast[int64](buf.get(idx + 3))
+    int64 b0 = buf.get(idx)
+    int64 b1 = buf.get(idx + 1)
+    int64 b2 = buf.get(idx + 2)
+    int64 b3 = buf.get(idx + 3)
     return (b0 << cast[int64](24)) | (b1 << cast[int64](16)) | (b2 << cast[int64](8)) | b3
 }
 
@@ -210,8 +210,8 @@ pub func bytes_eq(List[int32] a, List[int32] b) -> bool {
 pub func slice(List[int32] buf, int32 start, int32 end) -> List[int32] {
     List[int32] out = list_new()
     int64 n = buf.len()
-    int64 s = cast[int64](start)
-    int64 e = cast[int64](end)
+    int64 s = start
+    int64 e = end
     if (s < 0) {
         s = 0
     }

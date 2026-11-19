@@ -53,26 +53,26 @@ pub func base64_encode(List[int32] bytes) -> str {
         int32 b1 = bytes.get(i + 1)
         int32 b2 = bytes.get(i + 2)
         int32 combined = b0 * 65536 + b1 * 256 + b2
-        out = out + b64_char(cast[int64]((combined / 262144) % 64))
-        out = out + b64_char(cast[int64]((combined / 4096) % 64))
-        out = out + b64_char(cast[int64]((combined / 64) % 64))
-        out = out + b64_char(cast[int64](combined % 64))
+        out = out + b64_char((combined / 262144) % 64)
+        out = out + b64_char((combined / 4096) % 64)
+        out = out + b64_char((combined / 64) % 64)
+        out = out + b64_char(combined % 64)
         i = i + 3
     }
     int64 remaining = n - i
     if (remaining == 1) {
         int32 b0 = bytes.get(i)
         int32 combined = b0 * 65536
-        out = out + b64_char(cast[int64]((combined / 262144) % 64))
-        out = out + b64_char(cast[int64]((combined / 4096) % 64))
+        out = out + b64_char((combined / 262144) % 64)
+        out = out + b64_char((combined / 4096) % 64)
         out = out + "=="
     } else if (remaining == 2) {
         int32 b0 = bytes.get(i)
         int32 b1 = bytes.get(i + 1)
         int32 combined = b0 * 65536 + b1 * 256
-        out = out + b64_char(cast[int64]((combined / 262144) % 64))
-        out = out + b64_char(cast[int64]((combined / 4096) % 64))
-        out = out + b64_char(cast[int64]((combined / 64) % 64))
+        out = out + b64_char((combined / 262144) % 64)
+        out = out + b64_char((combined / 4096) % 64)
+        out = out + b64_char((combined / 64) % 64)
         out = out + "="
     }
     return out

@@ -81,7 +81,7 @@ pub func parse_int64(str s) -> int64? {
         if (c < '0' || c > '9') {
             return null
         }
-        int64 d = cast[int64](c - '0')
+        int64 d = c - '0'
         if (v < (lowest + d) / 10) {
             return null
         }

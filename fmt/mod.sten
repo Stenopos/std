@@ -7,7 +7,7 @@ module std.fmt
 /// negative int32 formats as its unsigned two's-complement view, e.g. -1 -> all
 /// ones). 2^32 = 4294967296.
 func u32_of(int32 n) -> int64 {
-    int64 u = cast[int64](n)
+    int64 u = n
     if (u < 0) {
         u = u + 4294967296
     }
@@ -112,7 +112,7 @@ pub func with_thousands(int64 n) -> str {
         if (i > 0 && (len - i) % 3 == 0) {
             out = out + ","
         }
-        int64 i64 = cast[int64](i)
+        int64 i64 = i
         out = out + digits.substring(i64, i64 + 1)
         i = i + 1
     }

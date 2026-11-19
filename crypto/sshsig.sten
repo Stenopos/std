@@ -56,7 +56,7 @@ func wire_len(List[int32] b, int64 pos) -> int64 {
     if (pos < 0 || pos + 4 > b.len()) {
         return 0 - 1
     }
-    int64 n = (cast[int64](b.get(pos)) << 24) | (cast[int64](b.get(pos + 1)) << 16) | (cast[int64](b.get(pos + 2)) << 8) | cast[int64](b.get(pos + 3))
+    int64 n = (b.get(pos) << 24) | (b.get(pos + 1) << 16) | (b.get(pos + 2) << 8) | b.get(pos + 3)
     if (pos + 4 + n > b.len()) {
         return 0 - 1
     }
@@ -174,11 +174,11 @@ pub func sshsig_verify(str armored, List[int32] msg, str namespace, str allowed_
     if (pos != b.len()) {
         return false
     }
-    List[int32] pk_blob = slice(b, cast[int64](fields_start.get(0)), cast[int64](fields_start.get(0) + fields_len.get(0)))
-    List[int32] ns = slice(b, cast[int64](fields_start.get(1)), cast[int64](fields_start.get(1) + fields_len.get(1)))
-    List[int32] reserved = slice(b, cast[int64](fields_start.get(2)), cast[int64](fields_start.get(2) + fields_len.get(2)))
-    List[int32] hash_alg = slice(b, cast[int64](fields_start.get(3)), cast[int64](fields_start.get(3) + fields_len.get(3)))
-    List[int32] sig_blob = slice(b, cast[int64](fields_start.get(4)), cast[int64](fields_start.get(4) + fields_len.get(4)))
+    List[int32] pk_blob = slice(b, fields_start.get(0), fields_start.get(0) + fields_len.get(0))
+    List[int32] ns = slice(b, fields_start.get(1), fields_start.get(1) + fields_len.get(1))
+    List[int32] reserved = slice(b, fields_start.get(2), fields_start.get(2) + fields_len.get(2))
+    List[int32] hash_alg = slice(b, fields_start.get(3), fields_start.get(3) + fields_len.get(3))
+    List[int32] sig_blob = slice(b, fields_start.get(4), fields_start.get(4) + fields_len.get(4))
     if (!same(pk_blob, want_blob) || !same(ns, bytes_of(namespace))) {
         return false
     }

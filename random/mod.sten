@@ -88,7 +88,7 @@ pub func rng_float(int64 state) -> float64 {
 /// True or false with (very close to) equal probability. Reads a high bit of the
 /// state rather than the low bit, which mixes better.
 pub func rng_bool(int64 state) -> bool {
-    return cast[int32](state) >= 1073741824
+    return state >= 1073741824
 }
 
 /// An int32 in the half-open range [lo, hi) (hi exclusive). Throws when the range

@@ -317,7 +317,7 @@ func fe_unpack(List[int32] b) -> List[int64] {
     List[int64] o = list_new()
     int64 i = 0
     while (i < 16) {
-        o.push(cast[int64](b.get(2 * i)) + (cast[int64](b.get(2 * i + 1)) << 8))
+        o.push(b.get(2 * i) + (cast[int64](b.get(2 * i + 1)) << 8))
         i = i + 1
     }
     o.set(15, o.get(15) & 32767)
@@ -473,14 +473,14 @@ func mod_l(List[int32] h) -> List[int32] {
     List[int32] lb = order_l()
     List[int64] x = list_new()
     for (b in h) {
-        x.push(cast[int64](b))
+        x.push(b)
     }
     int64 i = 63
     while (i >= 32) {
         int64 carry = 0
         int64 j = i - 32
         while (j < i - 12) {
-            int64 v = x.get(j) + carry - 16 * x.get(i) * cast[int64](lb.get(j - (i - 32)))
+            int64 v = x.get(j) + carry - 16 * x.get(i) * lb.get(j - (i - 32))
             carry = (v + 128) >> 8
             x.set(j, v - (carry << 8))
             j = j + 1
@@ -492,14 +492,14 @@ func mod_l(List[int32] h) -> List[int32] {
     int64 carry2 = 0
     int64 j2 = 0
     while (j2 < 32) {
-        int64 v2 = x.get(j2) + carry2 - (x.get(31) >> 4) * cast[int64](lb.get(j2))
+        int64 v2 = x.get(j2) + carry2 - (x.get(31) >> 4) * lb.get(j2)
         carry2 = v2 >> 8
         x.set(j2, v2 & 255)
         j2 = j2 + 1
     }
     j2 = 0
     while (j2 < 32) {
-        x.set(j2, x.get(j2) - carry2 * cast[int64](lb.get(j2)))
+        x.set(j2, x.get(j2) - carry2 * lb.get(j2))
         j2 = j2 + 1
     }
     List[int32] r = list_new()

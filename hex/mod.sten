@@ -32,8 +32,8 @@ func hex_nibble(int32 c) -> int32 {
 pub func hex_encode(List[int32] bytes) -> str {
     str out = ""
     for (b in bytes) {
-        int64 hi = cast[int64](b / 16)
-        int64 lo = cast[int64](b % 16)
+        int64 hi = b / 16
+        int64 lo = b % 16
         out = out + hex_digit(hi) + hex_digit(lo)
     }
     return out

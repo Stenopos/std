@@ -233,7 +233,7 @@ pub func to_upper(str s) -> str {
     while (i < n) {
         int32 c = s.byte_at(i)
         if (is_lower(c)) {
-            int64 k = cast[int64](c - 'a')
+            int64 k = c - 'a'
             parts.push(table.substring(k, k + 1))
         } else {
             parts.push(s.substring(i, i + 1))
@@ -252,7 +252,7 @@ pub func to_lower(str s) -> str {
     while (i < n) {
         int32 c = s.byte_at(i)
         if (is_upper(c)) {
-            int64 k = cast[int64](c - 'A')
+            int64 k = c - 'A'
             parts.push(table.substring(k, k + 1))
         } else {
             parts.push(s.substring(i, i + 1))

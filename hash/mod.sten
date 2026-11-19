@@ -17,7 +17,7 @@ pub func fnv1a_32_bytes(List[int32] bytes) -> int64 {
     int64 n = bytes.len()
     int64 i = 0
     while (i < n) {
-        int64 c = cast[int64](bytes.get(i))
+        int64 c = bytes.get(i)
         h = h ^ c
         h = (h * 16777619) % mask32()
         i = i + 1
@@ -31,7 +31,7 @@ pub func fnv1a_32_str(str s) -> int64 {
     int64 n = s.len()
     int64 i = 0
     while (i < n) {
-        int64 c = cast[int64](s.byte_at(i))
+        int64 c = s.byte_at(i)
         h = h ^ c
         h = (h * 16777619) % mask32()
         i = i + 1
@@ -46,7 +46,7 @@ pub func djb2_str(str s) -> int64 {
     int64 n = s.len()
     int64 i = 0
     while (i < n) {
-        int64 c = cast[int64](s.byte_at(i))
+        int64 c = s.byte_at(i)
         h = wrapping_add(wrapping_mul(h, 33), c)
         i = i + 1
     }
@@ -75,7 +75,7 @@ pub func crc32_bytes(List[int32] bytes) -> int64 {
     int64 n = bytes.len()
     int64 i = 0
     while (i < n) {
-        crc = crc32_step(crc, cast[int64](bytes.get(i)))
+        crc = crc32_step(crc, bytes.get(i))
         i = i + 1
     }
     return crc ^ 4294967295
@@ -87,7 +87,7 @@ pub func crc32_str(str s) -> int64 {
     int64 n = s.len()
     int64 i = 0
     while (i < n) {
-        crc = crc32_step(crc, cast[int64](s.byte_at(i)))
+        crc = crc32_step(crc, s.byte_at(i))
         i = i + 1
     }
     return crc ^ 4294967295

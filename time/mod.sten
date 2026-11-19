@@ -138,7 +138,7 @@ pub func is_leap(int64 year) -> bool {
 
 /// The calendar fields of `t` (Unix seconds) shifted by `offset` seconds.
 pub func at_offset(int64 t, int32 offset) -> DateTime {
-    int64 s = t + cast[int64](offset)
+    int64 s = t + offset
     int64 days = floor_div(s, 86400)
     int64 rem = s - days * 86400
     List[int64] ymd = civil_from_days(days)
@@ -189,7 +189,7 @@ func pad(int64 v, int32 width) -> str {
     if (neg) {
         s = s.substring(1, s.len())
     }
-    while (s.len() < cast[int64](width)) {
+    while (s.len() < width) {
         s = "0" + s
     }
     if (neg) {
@@ -213,7 +213,7 @@ func month_name(int32 m) -> str {
 /// The offset as `+hhmm`, or `+hh:mm` with `colon`.
 func offset_text(int32 offset, bool colon) -> str {
     str sign = "+"
-    int64 o = cast[int64](offset)
+    int64 o = offset
     if (o < 0) {
         sign = "-"
         o = 0 - o
@@ -240,17 +240,17 @@ pub func format(DateTime dt, str fmt) -> str {
             if (d == 'Y') {
                 out = out + pad(dt.year, 4)
             } else if (d == 'm') {
-                out = out + pad(cast[int64](dt.month), 2)
+                out = out + pad(dt.month, 2)
             } else if (d == 'd') {
-                out = out + pad(cast[int64](dt.day), 2)
+                out = out + pad(dt.day, 2)
             } else if (d == 'H') {
-                out = out + pad(cast[int64](dt.hour), 2)
+                out = out + pad(dt.hour, 2)
             } else if (d == 'M') {
-                out = out + pad(cast[int64](dt.minute), 2)
+                out = out + pad(dt.minute, 2)
             } else if (d == 'S') {
-                out = out + pad(cast[int64](dt.second), 2)
+                out = out + pad(dt.second, 2)
             } else if (d == 'j') {
-                out = out + pad(cast[int64](dt.yearday), 3)
+                out = out + pad(dt.yearday, 3)
             } else if (d == 'a') {
                 out = out + weekday_name(dt.weekday)
             } else if (d == 'b') {

@@ -145,7 +145,7 @@ func serialize_obj(List[Json] entries) -> str {
 /// TODO: what `peek` does.
 func peek(str s, List[int32] pos) -> int32 {
     int32 p = pos.get(0)
-    if (cast[int64](p) >= s.len()) {
+    if (p >= s.len()) {
         return 0 - 1
     }
     return s.byte_at(cast[int64](p))
@@ -176,7 +176,7 @@ pub func parse(str s) -> Json {
     skip_ws(s, pos)
     Json v = parse_value(s, pos)
     skip_ws(s, pos)
-    if (cast[int64](pos.get(0)) != s.len()) {
+    if (pos.get(0) != s.len()) {
         throw("json.parse: trailing characters after the value")
     }
     return v
@@ -269,7 +269,7 @@ func parse_number(str s, List[int32] pos) -> Json {
     while (go) {
         int32 c = peek(s, pos)
         if (c >= 48 && c <= 57) {
-            val = val * 10 + cast[int64](c - 48)
+            val = val * 10 + (c - 48)
             any = true
             advance(pos)
         } else if (c == 46 || c == 101 || c == 69) {

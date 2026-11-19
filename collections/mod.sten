@@ -12,7 +12,7 @@ module std.collections
 
 /// The integers from lo (inclusive) to hi (exclusive), in order.
 /// range(2, 5) -> [2, 3, 4]; range(5, 5) -> []. Length is hi - lo.
-/// (Half-open on purpose: the language's own `a..b` range is inclusive.)
+/// (Half-open, as the language's own `a..b` range is.)
 pub func range(int32 lo, int32 hi) -> List[int32] {
     List[int32] out = list_new()
     int32 i = lo

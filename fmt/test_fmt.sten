@@ -56,7 +56,7 @@ func test_thousands() -> int32 {
     fails += expect_str(with_thousands(cast[int64](0)), "0", "thousands 0")
     fails += expect_str(with_thousands(cast[int64](999)), "999", "thousands under 1000")
     fails += expect_str(with_thousands(cast[int64](1000)), "1,000", "thousands 1000")
-    fails += expect_str(with_thousands(cast[int64](0 - 1234)), "-1,234", "thousands negative")
+    fails += expect_str(with_thousands(0 - 1234), "-1,234", "thousands negative")
     return fails
 }
 
