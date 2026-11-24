@@ -94,7 +94,7 @@ pub func stat(str path) -> FileInfo {
         fail_on("stat", path)
     }
     List[str] f = st.split(" ")
-    str kind = f.get(3)
+    str kind = f.get(3).clone()
     return FileInfo {
         size: parse_int64(f.get(0)) ?? cast[int64](0),
         mtime: parse_int64(f.get(1)) ?? cast[int64](0),

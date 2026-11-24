@@ -117,7 +117,7 @@ pub func reverse[T](List[T] xs) -> List[T] {
     int64 i = xs.len()
     while (i > 0) {
         i -= 1
-        out.push(xs.get(i))
+        out.push(xs.get(i).clone())
     }
     return out
 }

@@ -59,7 +59,7 @@ func main() -> int32 {
     // appended with the tag and read back.
     str path = "/tmp/stenopos_logging_test.log"
     discard write_file(path, "")
-    FileLogger log = FileLogger { threshold: 2, tag: "build", path: path }
+    FileLogger log = FileLogger { threshold: 2, tag: "build", path: path.clone() }
     discard log.trace("dropped")
     discard log.debug("dropped")
     discard log.info("started")
@@ -71,7 +71,7 @@ func main() -> int32 {
 
     // A returned bool reflects whether a record was written.
     discard write_file(path, "")
-    FileLogger l2 = FileLogger { threshold: 3, tag: "", path: path }
+    FileLogger l2 = FileLogger { threshold: 3, tag: "", path: path.clone() }
     fails += expect(!l2.info("below threshold"), "log() returns false when dropped")
     fails += expect(l2.error("written"), "log() returns true when written")
     fails += expect_eq_str(read_file(path), "[ERROR] written\n", "only the kept record landed")

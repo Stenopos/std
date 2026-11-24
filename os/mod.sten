@@ -59,7 +59,7 @@ pub func execute(List[str] argv) -> Output {
 pub func execute_with(List[str] argv, ExecOptions opts) -> Output {
     str prog = ""
     if (argv.len() > 0) {
-        prog = argv.get(0)
+        prog = argv.get(0).clone()
     }
     str r = os_exec(nul_join(argv), nul_join(opts.env), opts.dir, opts.stdin)
     if (r == "") {
@@ -83,7 +83,7 @@ pub func environ() -> List[str] {
     str all = os_environ()
     List[str] out = list_new()
     if (all == "") {
-        return out
+        return out.clone()
     }
     for (e in all.split(str_from_byte(0))) {
         if (e != "") {

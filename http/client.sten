@@ -74,7 +74,7 @@ pub func fetch(ClientRequest q) -> Response {
     if (bad != "") {
         throw("http " + q.url + ": " + bad)
     }
-    str hosthdr = u.host
+    str hosthdr = u.host.clone()
     if (u.host.index_of(":") >= 0) {
         hosthdr = "[" + u.host + "]"
     }

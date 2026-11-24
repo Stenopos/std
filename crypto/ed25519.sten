@@ -255,7 +255,7 @@ func fe_sq(List[int64] a) -> List[int64] {
 
 /// a^(p-2) = 1/a.
 func fe_invert(List[int64] a) -> List[int64] {
-    List[int64] c = a
+    List[int64] c = a.clone()
     int32 k = 253
     while (k >= 0) {
         c = fe_sq(c)
@@ -269,7 +269,7 @@ func fe_invert(List[int64] a) -> List[int64] {
 
 /// a^((p-5)/8), used for square roots.
 func fe_pow2523(List[int64] a) -> List[int64] {
-    List[int64] c = a
+    List[int64] c = a.clone()
     int32 k = 250
     while (k >= 0) {
         c = fe_sq(c)
@@ -283,7 +283,7 @@ func fe_pow2523(List[int64] a) -> List[int64] {
 
 /// The canonical 32-byte little-endian encoding (fully reduced mod p).
 func fe_pack(List[int64] n) -> List[int32] {
-    List[int64] t = fe_carry(fe_carry(fe_carry(n)))
+    List[int64] t = fe_carry(fe_carry(fe_carry(n.clone())))
     int32 pass = 0
     while (pass < 2) {
         List[int64] m = fe_zero()
@@ -453,14 +453,14 @@ func pt_unpack_neg(List[int32] pk) -> List[int64] {
     t = fe_pow2523(t)
     t = fe_mul(fe_mul(fe_mul(t, num), den), den)
     List[int64] r0 = fe_mul(t, den)
-    if (!fe_eq(fe_mul(fe_sq(r0), den), num)) {
+    if (!fe_eq(fe_mul(fe_sq(r0), den), num.clone())) {
         r0 = fe_mul(r0, fe_sqrtm1())
     }
     if (!fe_eq(fe_mul(fe_sq(r0), den), num)) {
         List[int64] none = list_new()
         return none
     }
-    if (fe_parity(r0) == (pk.get(31) >> 7)) {
+    if (fe_parity(r0.clone()) == (pk.get(31) >> 7)) {
         r0 = fe_sub(fe_zero(), r0)
     }
     return pt_make(r0, r1, r2, fe_mul(r0, r1))

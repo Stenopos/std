@@ -14,7 +14,7 @@ func main() -> int32 {
     xs.push(1)
     xs.push(2)
 
-    List[int32] s = sort_i32(xs)
+    List[int32] s = sort_i32(xs.clone())
     fails += expect(s.get(0) == 1 && s.get(1) == 2 && s.get(2) == 3, "sort ascending")
     fails += expect(xs.get(0) == 3, "sort leaves input untouched")
 

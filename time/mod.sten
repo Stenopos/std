@@ -201,13 +201,13 @@ func pad(int64 v, int32 width) -> str {
 /// TODO: what `weekday_name` does.
 func weekday_name(int32 w) -> str {
     List[str] names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-    return names.get(cast[int64](w))
+    return names.get(cast[int64](w)).clone()
 }
 
 /// TODO: what `month_name` does.
 func month_name(int32 m) -> str {
     List[str] names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    return names.get(cast[int64](m - 1))
+    return names.get(cast[int64](m - 1)).clone()
 }
 
 /// The offset as `+hhmm`, or `+hh:mm` with `colon`.

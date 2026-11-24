@@ -49,7 +49,7 @@ func main() -> void {
     fails += expect(e.stdout == "ONLY=this\n", "execute_with passes exactly its environment")
     fails += expect(environ().len() > 0, "environ() lists this program's environment")
     List[str] none = list_new()
-    Output d = execute_with(["pwd"], ExecOptions { env: none, dir: "/", stdin: "" })
+    Output d = execute_with(["pwd"], ExecOptions { env: none.clone(), dir: "/", stdin: "" })
     fails += expect(d.stdout == "/\n", "execute_with runs in its directory")
     Output c = execute_with(["cat"], ExecOptions { env: none, dir: "", stdin: "fed in" })
     fails += expect(c.stdout == "fed in", "execute_with feeds standard input")

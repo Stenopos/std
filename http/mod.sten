@@ -120,7 +120,7 @@ pub func reason(int32 status) -> str {
 /// method "" and path "/", so a caller can route it without crashing.
 pub func parse_request(str raw) -> Request {
     int64 end = raw.index_of("\r\n\r\n")
-    str head = raw
+    str head = raw.clone()
     str rest = ""
     if (end >= 0) {
         head = raw.substring(0, end)
@@ -131,18 +131,18 @@ pub func parse_request(str raw) -> Request {
     str method = ""
     str target = "/"
     if (first.len() >= 2) {
-        method = first.get(0)
-        target = first.get(1)
+        method = first.get(0).clone()
+        target = first.get(1).clone()
     }
     List[str] headers = list_new()
     int64 i = 1
     while (i < lines.len()) {
         if (lines.get(i).index_of(":") > 0) {
-            headers.push(lines.get(i))
+            headers.push(lines.get(i).clone())
         }
         i = i + 1
     }
-    str body = rest
+    str body = rest.clone()
     str? cl = header_of(headers, "content-length")
     if (cl != null) {
         int64 n = parse_int64(cl!!) ?? cast[int64](0)
@@ -150,7 +150,7 @@ pub func parse_request(str raw) -> Request {
             body = rest.substring(0, n)
         }
     }
-    str path = target
+    str path = target.clone()
     str query = ""
     int64 q = target.index_of("?")
     if (q >= 0) {
@@ -214,7 +214,7 @@ func is_token(str s) -> bool {
 func header_lines_problem(List[str] lines) -> str {
     int64 i = 1
     while (i < lines.len()) {
-        str h = lines.get(i)
+        str h = lines.get(i).clone()
         if (h.starts_with(" ") || h.starts_with("\t")) {
             return "a folded header line"
         }
@@ -384,7 +384,7 @@ pub struct HttpConn {
         List[str] headers = list_new()
         int64 i = 1
         while (i < lines.len()) {
-            headers.push(lines.get(i))
+            headers.push(lines.get(i).clone())
             i = i + 1
         }
         int64 length = content_length(headers)
@@ -421,8 +421,8 @@ pub struct HttpConn {
             body = this.buf.substring(0, length)
             this.buf = this.buf.substring(length, this.buf.len())
         }
-        str target = first.get(1)
-        str path = target
+        str target = first.get(1).clone()
+        str path = target.clone()
         str query = ""
         int64 q = target.index_of("?")
         if (q >= 0) {
@@ -437,7 +437,7 @@ pub struct HttpConn {
         if (!keep) {
             this.open = false
         }
-        return Request { method: first.get(0), path: path, query: query, headers: headers, body: body, keep_alive: keep }
+        return Request { method: first.get(0).clone(), path: path, query: query, headers: headers, body: body, keep_alive: keep }
     }
 
     /// Answer the request `next` returned. Content-Length is set from the
@@ -525,7 +525,7 @@ pub struct HttpConn {
                     }
                     trailers = t!! != ""
                 }
-                return body
+                return body.clone()
             }
             if (body.len() + size > this.limits.max_body_bytes) {
                 this.refuse(413, "request body too large\n")
@@ -600,7 +600,7 @@ pub func parse_url(str url) -> Url {
     } else {
         throw("http: not an http:// or https:// URL: " + url)
     }
-    str hostport = rest
+    str hostport = rest.clone()
     str target = "/"
     int64 slash = rest.index_of("/")
     if (slash >= 0) {
@@ -611,7 +611,7 @@ pub func parse_url(str url) -> Url {
     if (https) {
         port = 443
     }
-    str host = hostport
+    str host = hostport.clone()
     if (hostport.starts_with("[")) {             // [::1]:8080
         int64 close_br = hostport.index_of("]")
         if (close_br < 0) {
@@ -651,7 +651,7 @@ pub func parse_response(str raw, bool head, str url) -> Response {
     if (first.len() < 2 || !http_version(first.get(0))) {
         throw("http " + url + ": not an HTTP/1.x response")
     }
-    str code = first.get(1)
+    str code = first.get(1).clone()
     int32? status = parse_int32(code)
     if (code.len() != 3 || status == null || status!! < 100) {
         throw("http " + url + ": bad status line: " + lines.get(0))
@@ -663,11 +663,11 @@ pub func parse_response(str raw, bool head, str url) -> Response {
     List[str] headers = list_new()
     int64 i = 1
     while (i < lines.len()) {
-        headers.push(lines.get(i))
+        headers.push(lines.get(i).clone())
         i = i + 1
     }
     str rest = raw.substring(end + 4, raw.len())
-    str body = rest
+    str body = rest.clone()
     int64 length = content_length(headers)
     str? te = header_of(headers, "transfer-encoding")
     if (head || status!! == 204 || status!! == 304 || status!! < 200) {

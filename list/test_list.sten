@@ -112,7 +112,7 @@ func test_building() -> int32 {
     names.push("a")
     names.push("b")
     List[str] rn = reverse(names)
-    str head = rn.get(0)
+    str head = rn.get(0).clone()
     fails += expect(head == "b", "reverse str")
     return fails
 }

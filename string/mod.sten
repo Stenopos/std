@@ -155,7 +155,7 @@ pub func split(str s, str delim) -> List[str] {
     int64 n = s.len()
     if (m == 0) {
         parts.push(s.substring(0, n))
-        return parts
+        return parts.clone()
     }
     int64 start = 0
     int64 i = 0
@@ -180,9 +180,9 @@ pub func join(List[str] parts, str sep) -> str {
     int64 i = 0
     while (i < n) {
         if (i > 0) {
-            out.push(sep)
+            out.push(sep.clone())
         }
-        out.push(parts.get(i))
+        out.push(parts.get(i).clone())
         i += 1
     }
     return out.join()
@@ -194,7 +194,7 @@ pub func repeat_str(str s, int32 n) -> str {
     List[str] parts = list_new()
     int32 i = 0
     while (i < n) {
-        parts.push(s)
+        parts.push(s.clone())
         i += 1
     }
     return parts.join()
@@ -273,7 +273,7 @@ pub func pad_left(str s, int64 width, str fill) -> str {
     List[str] parts = list_new()
     int64 i = n
     while (i < width) {
-        parts.push(f)
+        parts.push(f.clone())
         i += 1
     }
     parts.push(s)
@@ -292,7 +292,7 @@ pub func pad_right(str s, int64 width, str fill) -> str {
     parts.push(s)
     int64 i = n
     while (i < width) {
-        parts.push(f)
+        parts.push(f.clone())
         i += 1
     }
     return parts.join()
