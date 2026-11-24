@@ -321,7 +321,7 @@ func parse_array(str s, List[int32] pos) -> Json {
     skip_ws(s, pos)
     if (peek(s, pos) == 93) {          // empty ']'
         advance(pos)
-        return Json.JArr(items.clone())
+        return Json.JArr(items)
     }
     bool go = true
     while (go) {
@@ -347,7 +347,7 @@ func parse_object(str s, List[int32] pos) -> Json {
     skip_ws(s, pos)
     if (peek(s, pos) == 125) {         // empty '}'
         advance(pos)
-        return Json.JObj(entries.clone())
+        return Json.JObj(entries)
     }
     bool go = true
     while (go) {

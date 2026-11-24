@@ -161,7 +161,7 @@ pub func poll(List[Conn] conns, int32 ms) -> List[int32] {
         if (why != "") {
             throw("poll: " + why)
         }
-        return out.clone()
+        return out
     }
     for (part in ready.split(",")) {
         out.push(parse_int32(part) ?? 0)

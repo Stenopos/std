@@ -155,7 +155,7 @@ pub func split(str s, str delim) -> List[str] {
     int64 n = s.len()
     if (m == 0) {
         parts.push(s.substring(0, n))
-        return parts.clone()
+        return parts
     }
     int64 start = 0
     int64 i = 0

@@ -37,7 +37,7 @@ pub func read_lines(str path) -> List[str] {
 pub func write_lines(str path, List[str] lines) -> bool {
     List[str] parts = list_new()
     for (line in lines) {
-        parts.push(line)
+        parts.push(line.clone())
         parts.push("\n")
     }
     return write_file(path, parts.join())

@@ -244,7 +244,7 @@ func decimal_int64(str d) -> int64? {
 /// TODO: what `join_path` does.
 func join_path(str a, str b) -> str {
     if (a.len() == 0) {
-        return b.clone()
+        return b
     }
     return a + "." + b
 }
@@ -514,7 +514,7 @@ struct Reader {
         if (c == '"' || c == '\'') {
             str v = this.read_string()
             if (!this.failed()) {
-                this.add(path.clone(), TOML_STRING, v, 0)
+                this.add(path, TOML_STRING, v, 0)
             }
         } else if (c == 't' && this.s.substring(this.i, this.i + 4) == "true") {
             this.i += 4

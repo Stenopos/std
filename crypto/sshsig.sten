@@ -83,7 +83,7 @@ func ed25519_key_of(List[int32] blob) -> List[int32] {
     List[int32] none = list_new()
     int64 tn = wire_len(blob, 0)
     if (tn < 0 || !same(slice(blob, 4, 4 + tn), bytes_of("ssh-ed25519"))) {
-        return none.clone()
+        return none
     }
     int64 kpos = 4 + tn
     int64 kn = wire_len(blob, kpos)
@@ -99,7 +99,7 @@ pub func ssh_public_key_blob(str line) -> List[int32] {
     List[int32] none = list_new()
     List[str] parts = line.trim().split(" ")
     if (parts.len() < 2 || parts.get(0) != "ssh-ed25519") {
-        return none.clone()
+        return none
     }
     List[int32] blob = none.clone()
     try {

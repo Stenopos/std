@@ -83,11 +83,11 @@ pub func environ() -> List[str] {
     str all = os_environ()
     List[str] out = list_new()
     if (all == "") {
-        return out.clone()
+        return out
     }
     for (e in all.split(str_from_byte(0))) {
         if (e != "") {
-            out.push(e)
+            out.push(e.clone())
         }
     }
     return out

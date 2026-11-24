@@ -68,7 +68,7 @@ pub func repeat_str(str s, int32 n) -> str {
 pub func pad_left(str s, int32 width, str pad) -> str {
     int32 len = cast[int32](s.len())
     if (len >= width) {
-        return s.clone()
+        return s
     }
     return repeat_str(pad, width - len) + s
 }
@@ -77,7 +77,7 @@ pub func pad_left(str s, int32 width, str pad) -> str {
 pub func pad_right(str s, int32 width, str pad) -> str {
     int32 len = cast[int32](s.len())
     if (len >= width) {
-        return s.clone()
+        return s
     }
     return s + repeat_str(pad, width - len)
 }
@@ -89,7 +89,7 @@ pub func pad_right(str s, int32 width, str pad) -> str {
 pub func zero_pad(int32 n, int32 width) -> str {
     str s = "{n}"
     if (n < 0) {
-        return s.clone()
+        return s
     }
     return pad_left(s, width, "0")
 }

@@ -31,7 +31,7 @@ func copy_i64(List[int64] xs) -> List[int64] {
 func copy_str(List[str] xs) -> List[str] {
     List[str] out = list_new()
     for (v in xs) {
-        out.push(v)
+        out.push(v.clone())
     }
     return out
 }

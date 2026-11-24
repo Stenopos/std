@@ -525,7 +525,7 @@ pub struct HttpConn {
                     }
                     trailers = t!! != ""
                 }
-                return body.clone()
+                return body
             }
             if (body.len() + size > this.limits.max_body_bytes) {
                 this.refuse(413, "request body too large\n")
