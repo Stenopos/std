@@ -170,8 +170,8 @@ pub func exit_grace(int32 ms) -> void {
 
 /// End the program with `code` (0 success). Every task is cancelled, and
 /// then main: each unwinds from where it waits (a channel, a sleep, a
-/// socket, a child process, a join), running its `defer` and `finally`
-/// blocks; no `catch` takes it. The program ends once the tasks have
+/// socket, a child process, a join, a lock, a semaphore), running its
+/// `defer` and `finally` blocks; no `catch` takes it. The program ends once the tasks have
 /// stopped, after at most exit_grace (1 s unless set); a task that never
 /// waits can't be cancelled and is left running then. Called from a task,
 /// exit wakes main the same way. So a service can finish its work on
