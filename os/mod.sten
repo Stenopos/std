@@ -161,15 +161,21 @@ pub func notify_signals(List[int32] sigs, chan[int32] into) -> void {
 /// milliseconds, it says which wait ran out and exits with code 124 (as
 /// `timeout` does), cleaning up as exit() does. Unset, main's return waits
 /// for every task, however long: work a program started is finished, never
-/// cut off. A service under Kubernetes might set 25000 (SIGKILL comes 30 s
-/// after SIGTERM); a batch job leaves it unset.
+/// cut off. It is also how long exit() waits for the tasks to stop (1 s
+/// when unset). A service under Kubernetes might set 25000 (SIGKILL comes
+/// 30 s after SIGTERM); a batch job leaves it unset.
 pub func exit_grace(int32 ms) -> void {
     discard os_exit_grace(ms)
 }
 
-/// Exit now with `code` (0 success), after flushing what was printed. Tasks
-/// still waiting (an accept loop, a reader) don't hold the exit up, so a
-/// service can finish its work on SIGTERM and then call exit(0).
+/// End the program with `code` (0 success). Every task is cancelled, and
+/// then main: each unwinds from where it waits (a channel, a sleep, a
+/// socket, a child process, a join), running its `defer` and `finally`
+/// blocks; no `catch` takes it. The program ends once the tasks have
+/// stopped, after at most exit_grace (1 s unless set); a task that never
+/// waits can't be cancelled and is left running then. Called from a task,
+/// exit wakes main the same way. So a service can finish its work on
+/// SIGTERM, call exit(0), and still close what it holds in its defers.
 pub func exit(int32 code) -> void {
     discard os_exit(code)
 }
